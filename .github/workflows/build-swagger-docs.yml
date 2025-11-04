@@ -52,16 +52,25 @@ jobs:
           unzip -q swagger-ui.zip
           cp -r swagger-ui-master/dist/* .
           rm -rf swagger-ui-master swagger-ui.zip
-
-          # 2) Petstore -> 우리 스키마로 교체
-          sed -i -E \
-            -e 's|url: *"https://petstore.swagger.io/v2/swagger.json"|url: "./openapi.json"|g' \
-            -e 's|urls: *\[[^]]*\]|url: "./openapi.json"|g' \
-            index.html
-
-          # 3) 교체 검증
-          grep -q "./openapi.json" index.html || (echo "index.html 교체 실패" && exit 1)
-
+      
+          # 2) swagger-initializer.js를 우리가 원하는 설정으로 덮어쓰기
+          cat > swagger-initializer.js << 'EOF'
+          window.onload = function() {
+            window.ui = SwaggerUIBundle({
+              url: "./openapi.json",
+              dom_id: '#swagger-ui',
+              presets: [
+                SwaggerUIBundle.presets.apis,
+                SwaggerUIStandalonePreset
+              ],
+              layout: "StandaloneLayout"
+            });
+          };
+          EOF
+      
+          # 3) 교체 검증 (없으면 실패)
+          grep -q "./openapi.json" swagger-initializer.js || (echo "initializer 교체 실패" && exit 1)
+      
           # 4) 스키마 파일 배치
           cd ../..
           cp openapi.json docs/docs/openapi.json
