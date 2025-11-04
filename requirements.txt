@@ -2,3 +2,7 @@ fastapi
 uvicorn
 sqlalchemy[asyncio]
 alembic
+starlette
+argon2-cffi
+pyjwt
+aiosqlite
