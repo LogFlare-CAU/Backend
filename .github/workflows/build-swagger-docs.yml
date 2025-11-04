@@ -1,0 +1,78 @@
+name: Build Swagger Docs
+
+on:
+  pull_request:
+    branches: ["**"]
+  push:
+    branches: ["main"]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+env:
+  APP_MODULE: app.main:app   # <- FastAPI 앱 경로로 수정 (예: package.module:app)
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install fastapi pydantic
+          # 프로젝트 패키지가 필요하면 주석 해제
+          # pip install -e .
+
+      - name: Export openapi.json (no server)
+        run: |
+          python scripts/export_openapi.py $APP_MODULE
+
+      - name: Prepare Swagger UI under /docs
+        run: |
+          mkdir -p docs/docs
+          cd docs/docs
+          curl -L https://github.com/swagger-api/swagger-ui/archive/refs/heads/master.zip -o swagger-ui.zip
+          unzip -q swagger-ui.zip
+          cp -r swagger-ui-master/dist/* .
+          rm -rf swagger-ui-master swagger-ui.zip
+          # SwaggerUIBundle가 참조하는 스펙 URL을 openapi.json으로 변경
+          sed -i 's|url: "https://petstore.swagger.io/v2/swagger.json"|url: "openapi.json"|' index.html
+          cd ../..
+          # openapi.json을 /docs/openapi.json -> 최종 URL: /docs/openapi.json
+          cp openapi.json docs/docs/openapi.json
+
+      - name: Upload artifact on PR
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: swagger-docs-pr-${{ github.event.pull_request.number }}
+          path: docs
+
+      - name: Upload Pages artifact on push to main
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+  deploy:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
