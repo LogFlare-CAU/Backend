@@ -16,6 +16,7 @@ concurrency:
 
 env:
   APP_MODULE: app.main:app  # <- FastAPI 앱 모듈 경로에 맞게 수정
+  SUPPRESS_VARIABLE_NOT_ASSIGNED_ERROR: "true"
 
 jobs:
   build:
