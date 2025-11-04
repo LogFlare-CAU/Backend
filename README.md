@@ -129,3 +129,6 @@ async def get_users(request: Request):
 
 * Swagger UI는 `/docs` 엔드포인트에서 자동 생성됩니다.
 * 모든 API는 `common.schema.APIResponse`를 상속하거나 `response_maker`를 통해 일관된 응답을 보장합니다.
+
+## 🌐 Swagger 문서
+https://logflare-cau.github.io/Backend/docs/  에서 확인 가능합니다.
