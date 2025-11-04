@@ -1,3 +1,6 @@
 .idea
 migrations
 Dockerfile
+*.sqlite
+*.env
+__pycache__
