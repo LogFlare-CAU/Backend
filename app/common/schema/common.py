@@ -1,4 +1,4 @@
-from typing import Generic, Optional, TypeVar
+from typing import Generic, Optional, TypeVar, Any
 from pydantic import BaseModel, Field, ConfigDict
 
 T = TypeVar("T")
@@ -8,22 +8,20 @@ class APIResponse(BaseModel, Generic[T]):
     """
     API 공통 응답 스키마
     """
-
     success: bool = Field(True, description="API 호출 성공 여부")
     message: str = Field("success", description="처리 결과에 대한 메시지")
     error_code: Optional[int] = Field(None, description="에러 코드")
     data: Optional[T] = Field(None, description="API 호출 결과 데이터")
 
 
-class ErrorResponse(APIResponse[str]):
+class ErrorResponse(APIResponse[Any]):
     """
     API 에러 응답 스키마
     """
-
     success: bool = Field(False, description="API 호출 성공 여부")
     message: str = Field("error", description="에러 메시지")
     error_code: int = Field(..., description="에러 코드")
-    data: Optional[str] = Field(..., description="에러 상세 메시지")
+    data: Optional[Any] = Field(None, description="에러 상세 메시지")
     model_config = ConfigDict(title="ErrorResponse")
 
 
