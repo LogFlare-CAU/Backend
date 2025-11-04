@@ -1,9 +1,7 @@
 name: Build Swagger Docs
 
 on:
-  # PR이 main에 "merge"되어 닫힐 때만 트리거
-  pull_request:
-    types: [closed]
+  push:
     branches: ["main"]
 
 permissions:
@@ -12,16 +10,13 @@ permissions:
   id-token: write
 
 env:
-  APP_MODULE: app.main:app   # <- FastAPI 앱 경로로 수정 (예: package.module:app)
+  APP_MODULE: app.main:app
 
 jobs:
   build:
-    # merge되지 않고 닫힌 PR은 무시
-    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
+      - name: Checkout merged main
         uses: actions/checkout@v4
 
       - name: Set up Python
@@ -35,8 +30,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Export openapi.json (no server)
-        run: |
-          python scripts/export_openapi.py $APP_MODULE
+        run: python scripts/export_openapi.py $APP_MODULE
 
       - name: Prepare Swagger UI under /docs
         run: |
@@ -46,10 +40,8 @@ jobs:
           unzip -q swagger-ui.zip
           cp -r swagger-ui-master/dist/* .
           rm -rf swagger-ui-master swagger-ui.zip
-          # SwaggerUIBundle가 참조하는 스펙 URL을 openapi.json으로 변경
           sed -i 's|url: "https://petstore.swagger.io/v2/swagger.json"|url: "openapi.json"|' index.html
           cd ../..
-          # 최종 접근 경로: <Pages 루트>/docs/openapi.json
           cp openapi.json docs/docs/openapi.json
 
       - name: Upload Pages artifact
