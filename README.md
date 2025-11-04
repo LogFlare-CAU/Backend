@@ -78,6 +78,6 @@ from common.schema import response_maker
 async def get_users(request: Request):
     return APIResponse
 ```
-
+- `make_named_response` 함수는 sqlalchemy orm  객체를 swagger 에서 볼 수 있는 DTO 로 변환합니다.
 - `response_model` 에 응답 형식을 지정하는것으로 깔끔하게 볼 수 있습니다.
 - `response_maker` 를 사용하면 쉽게 에러 정보들을 포함시킬 수 있습니다.
