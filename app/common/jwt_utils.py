@@ -1,11 +1,10 @@
 import time
 import jwt
-import os
 
-secret = os.getenv("JWT_SECRET", None)
+from .env_utils import getenvval
+
 algorithm = "HS256"
-if not secret:
-    raise Exception("JWT_SECRET environment variable is not set")
+secret = getenvval("JWT_SECRET")
 
 def generate_jwt(payload: dict):
     """
