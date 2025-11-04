@@ -1,9 +1,9 @@
 name: Build Swagger Docs
 
 on:
+  # PR이 main에 "merge"되어 닫힐 때만 트리거
   pull_request:
-    branches: ["**"]
-  push:
+    types: [closed]
     branches: ["main"]
 
 permissions:
@@ -16,6 +16,8 @@ env:
 
 jobs:
   build:
+    # merge되지 않고 닫힌 PR은 무시
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
 
     steps:
@@ -30,9 +32,7 @@ jobs:
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          pip install fastapi pydantic
-          # 프로젝트 패키지가 필요하면 주석 해제
-          # pip install -e .
+          pip install -r requirements.txt
 
       - name: Export openapi.json (no server)
         run: |
@@ -49,24 +49,15 @@ jobs:
           # SwaggerUIBundle가 참조하는 스펙 URL을 openapi.json으로 변경
           sed -i 's|url: "https://petstore.swagger.io/v2/swagger.json"|url: "openapi.json"|' index.html
           cd ../..
-          # openapi.json을 /docs/openapi.json -> 최종 URL: /docs/openapi.json
+          # 최종 접근 경로: <Pages 루트>/docs/openapi.json
           cp openapi.json docs/docs/openapi.json
 
-      - name: Upload artifact on PR
-        if: ${{ github.event_name == 'pull_request' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: swagger-docs-pr-${{ github.event.pull_request.number }}
-          path: docs
-
-      - name: Upload Pages artifact on push to main
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: docs
 
   deploy:
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     needs: build
     runs-on: ubuntu-latest
     environment:
