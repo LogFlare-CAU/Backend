@@ -47,20 +47,20 @@ jobs:
         run: |
           python scripts/export_openapi.py $APP_MODULE
 
-      # ✅ main에 push될 때 정식 문서(/docs) 생성
+      # ✅ main에 push될 때 정식 문서(/docs) 생성 (중첩 제거: docs/ 바로 아래에 생성)
       - name: Prepare Swagger UI under /docs (main site)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          mkdir -p docs/docs
-          cd docs/docs
-          curl -L https://github.com/swagger-api/swagger-ui/archive/refs/heads/master.zip -o swagger-ui.zip
-          unzip -q swagger-ui.zip
-          cp -r swagger-ui-master/dist/* .
-          rm -rf swagger-ui-master swagger-ui.zip
+          mkdir -p docs
+          cd docs
+          curl -L https://github.com/swagger-api/swagger-ui/archive/refs/heads/master.zip -o /tmp/swagger-ui.zip
+          unzip -q /tmp/swagger-ui.zip -d /tmp
+          cp -r /tmp/swagger-ui-master/dist/* .
+          rm -rf /tmp/swagger-ui-master /tmp/swagger-ui.zip
           cat > swagger-initializer.js << 'EOF'
           window.onload = function() {
             window.ui = SwaggerUIBundle({
-              url: "./openapi.json",      # ✅ petstore 제거
+              url: "./openapi.json",
               dom_id: '#swagger-ui',
               presets: [
                 SwaggerUIBundle.presets.apis,
@@ -70,14 +70,14 @@ jobs:
             });
           };
           EOF
-          cd ../..
-          cp openapi.json docs/docs/openapi.json
+          cd ..
+          cp openapi.json docs/openapi.json
 
-      # ✅ PR일 때: /docs/pr/<번호> 폴더에 미리보기 UI 생성
+      # ✅ PR일 때: /docs/pr/<번호> 미리보기 생성 (중첩 제거)
       - name: Prepare PR preview under /docs/pr/<num>
         if: github.event_name == 'pull_request' && github.event.pull_request.draft == false && github.event.action != 'closed'
         run: |
-          PREVIEW_DIR="pr-tmp/docs/pr/${{ github.event.number }}"
+          PREVIEW_DIR="pr-tmp/pr/${{ github.event.number }}"
           mkdir -p "$PREVIEW_DIR"
           curl -L https://github.com/swagger-api/swagger-ui/archive/refs/heads/master.zip -o /tmp/swagger-ui.zip
           unzip -q /tmp/swagger-ui.zip -d /tmp
@@ -86,7 +86,7 @@ jobs:
           cat > "$PREVIEW_DIR/swagger-initializer.js" << 'EOF'
           window.onload = function() {
             window.ui = SwaggerUIBundle({
-              url: "./openapi.json",      # ✅ PR 프리뷰도 petstore 제거
+              url: "./openapi.json",
               dom_id: '#swagger-ui',
               presets: [
                 SwaggerUIBundle.presets.apis,
@@ -106,15 +106,16 @@ jobs:
           path: docs
 
       # ✅ PR일 때는 gh-pages 브랜치에 부분 커밋 (keep_files)
+      #     publish_dir=pr-tmp (안에 pr/<num> 구조), destination_dir=docs → 최종 /docs/pr/<num>
       - name: Push PR preview to gh-pages (keep_files)
         if: github.event_name == 'pull_request' && github.event.pull_request.draft == false && github.event.action != 'closed'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: pr-tmp
-          destination_dir: docs          # /docs/pr/<num> 아래로 통합 관리
+          destination_dir: docs
           keep_files: true
-          enable_jekyll: false           # Jekyll 무효화 (폴더 무시 방지)
+          enable_jekyll: false
 
   # ✅ main push일 때만 정식 배포 (→ /docs)
   deploy:
@@ -128,8 +129,6 @@ jobs:
       - id: deployment
         name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
-        # with:
-        #   destination_dir: docs  # 공식 액션에는 해당 입력이 없으므로 삭제
 
   # ✅ PR 닫히면 해당 PR 폴더만 gh-pages에서 삭제
   cleanup:
