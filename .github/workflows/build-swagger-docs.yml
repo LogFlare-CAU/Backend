@@ -21,6 +21,9 @@ env:
 
 jobs:
   build:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    # PR이 아닌 이벤트(= main에 push)에서는 항상 실행,
+    # PR 이벤트인 경우에만 draft가 아닐 때 실행
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
