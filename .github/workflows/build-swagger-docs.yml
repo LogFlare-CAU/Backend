@@ -100,7 +100,9 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: pr-tmp/docs/pr/${{ github.event.number }}
+          destination_dir: docs/pr/${{ github.event.number }}   # ✅ 이 줄 추가
           keep_files: true
+
 
 
   # ✅ main push일 때만 정식 배포
