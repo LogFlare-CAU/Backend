@@ -7,6 +7,7 @@ from common.jwt_utils import generate_jwt
 from common.security import hash_password
 from . import model, schema
 
+
 async def get_user(conn: AsyncSession, username: str) -> model.User:
     stmt = select(model.User).where(model.User.username == username)
     result = await conn.execute(stmt)
@@ -14,6 +15,7 @@ async def get_user(conn: AsyncSession, username: str) -> model.User:
     if not user:
         raise HTTPException(HTTP_404_NOT_FOUND)
     return user
+
 
 async def create_user(conn: AsyncSession, item: schema.UserCreateParams) -> model.User:
     stmt = select(model.User).where(model.User.username == item.username)
@@ -27,6 +29,7 @@ async def create_user(conn: AsyncSession, item: schema.UserCreateParams) -> mode
     await conn.refresh(user)
     return user
 
+
 async def delete_user(conn: AsyncSession, useridx: int) -> model.User:
     stmt = select(model.User).where(model.User.idx == useridx)
     result = await conn.execute(stmt)
@@ -37,7 +40,9 @@ async def delete_user(conn: AsyncSession, useridx: int) -> model.User:
     await conn.commit()
     return user
 
+
 async def get_user_byid(conn: AsyncSession, useridx: int) -> model.User:
+    """1번 사용자는 항상 슈퍼유저이다."""
     stmt = select(model.User).where(model.User.idx == useridx)
     result = await conn.execute(stmt)
     user = result.scalar_one_or_none()
@@ -45,16 +50,35 @@ async def get_user_byid(conn: AsyncSession, useridx: int) -> model.User:
         raise HTTPException(HTTP_404_NOT_FOUND)
     return user
 
-async def create_token(conn: AsyncSession, user_idx: int, keep_logged:bool = False) -> model.Token:
+
+async def create_token(
+    conn: AsyncSession, user_idx: int, keep_logged: bool = False
+) -> model.Token:
+    await delete_expired_tokens(conn)
     user = await get_user_byid(conn, user_idx)
     token = model.Token(user_idx=user.idx)
-    json = {"idx": user.idx, 'perm': user.permission}
+    json = {"idx": user.idx, "perm": user.permission}
     if keep_logged:
         json["exp"] = None
     else:
         json["exp"] = int(time.time()) + 900  # 15 minutes
     token.token = generate_jwt(json)
+    token.exp = json["exp"]
     conn.add(token)
     await conn.commit()
     await conn.refresh(token)
     return token
+
+
+async def delete_expired_tokens(conn: AsyncSession) -> None:
+    now = int(time.time())
+    stmt = (
+        select(model.Token)
+        .where(model.Token.exp.isnot(None))
+        .where(model.Token.exp < now)
+    )
+    result = await conn.execute(stmt)
+    expired_tokens = result.scalars().all()
+    for token in expired_tokens:
+        await conn.delete(token)
+    await conn.commit()
