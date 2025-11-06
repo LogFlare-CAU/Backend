@@ -9,6 +9,11 @@ from . import schema, application, service
 router = APIRouter(prefix="/log", tags=["log"])
 
 
+@router.get("/")
+async def health_check():
+    return {"status": "ok"}
+
+
 @router.post(
     "/error",
     status_code=204,
