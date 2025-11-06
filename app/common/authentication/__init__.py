@@ -1,1 +1,0 @@
-from .authenticate import require_moderator
