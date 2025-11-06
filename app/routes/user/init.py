@@ -16,9 +16,9 @@ async def init_superuser():
     1번 유저가 이미 존재하고 관리자 권한이면 아무 작업도 하지 않습니다.
     1번 유저의 기본 이름과 비밀번호는 admin, admin입니다.
     """
-    user = getenvval("SUPERUSER_NAME")
+    username = getenvval("SUPERUSER_NAME")
     password = getenvval("SUPERUSER_PASSWORD")
-    if not user or not password:
+    if not username or not password:
         logger.warning(
             "슈퍼유저 이름 또는 비밀번호가 설정되지 않았습니다. 슈퍼유저를 생성하지 않습니다."
         )
@@ -39,13 +39,13 @@ async def init_superuser():
             return
         except:
             user = model.User(
-                username=user,
+                username=username,
                 password=hash_password(password),
                 permission=Permissions.ADMINISTRATOR,
             )
             conn.add(user)
             await conn.commit()
             logger.info(
-                f"슈퍼유저 계정이 생성되었습니다({user}, {password}). 즉시 비밀번호를 바꿔주세요."
+                f"슈퍼유저 계정이 생성되었습니다({username}, {password}). 즉시 비밀번호를 바꿔주세요."
             )
             return

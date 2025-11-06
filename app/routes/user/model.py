@@ -27,4 +27,4 @@ class Token(Base):
         nullable=False,
         comment="사용자 고유번호",
     )
-    exp = Column(Integer, nullable=False, comment="토큰 만료 시간(UNIX TIMESTAMP)")
+    exp = Column(Integer, nullable=True, comment="토큰 만료 시간(UNIX TIMESTAMP)")
