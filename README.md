@@ -1,4 +1,4 @@
-<h1 align="center">🚀 LogFlare Backend</h1>
+<h1 align="center">🚀 LogFlare Backend Server</h1>
 
 
 <p align="center">
