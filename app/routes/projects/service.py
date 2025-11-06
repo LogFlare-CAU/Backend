@@ -1,3 +1,5 @@
+from typing import Sequence
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -10,9 +12,12 @@ async def create_project(
     conn: AsyncSession, items: schema.ProjectCreateParams
 ) -> model.Project:
     project = model.Project(name=items.name)
-    json = {"project_name": project.name}
-    project.token = generate_jwt(json)
     conn.add(project)
+    await conn.commit()
+    await conn.refresh(project)
+    json = {"name": project.name, "id": project.id}
+    token = generate_jwt(json)
+    project.token = token
     await conn.commit()
     await conn.refresh(project)
     return project
@@ -68,3 +73,18 @@ async def add_logfile(
     await conn.commit()
     await conn.refresh(logfile)
     return logfile
+
+
+async def list_projects(conn: AsyncSession) -> Sequence[model.Project]:
+    result = await conn.execute(select(model.Project))
+    projects = result.scalars().all()
+    return projects
+
+
+async def get_project_perms(
+    conn: AsyncSession, userid: int
+) -> Sequence[model.ProjectPerms]:
+    stmt = select(model.ProjectPerms).where(model.ProjectPerms.user_id == userid)
+    result = await conn.execute(stmt)
+    perms = result.scalars().all()
+    return perms
