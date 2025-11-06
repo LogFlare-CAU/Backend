@@ -99,8 +99,9 @@ jobs:
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: pr-tmp
+          publish_dir: pr-tmp/docs/pr/${{ github.event.number }}
           keep_files: true
+
 
   # ✅ main push일 때만 정식 배포
   deploy:
