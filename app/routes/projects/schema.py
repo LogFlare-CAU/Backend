@@ -1,3 +1,5 @@
+from typing import Sequence
+
 from common.schema import make_named_response
 from . import model
 from pydantic import BaseModel, Field
@@ -13,3 +15,7 @@ class LogFileCreateParams(BaseModel):
 
 
 ProjectResponse = make_named_response(model.Project, "ProjectResponse")
+ProjectSequenceResponse = make_named_response(
+    Sequence[model.Project], "ProjectSequenceResponse"
+)
+LogFileResponse = make_named_response(model.LogFile, "LogFileResponse")
