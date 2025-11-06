@@ -2,9 +2,9 @@ name: Build Swagger Docs
 
 on:
   push:
-    branches: ["main"]          # main에 push될 때 => build + deploy
+    branches: ["main"]       # main에 push될 때 => build + deploy
   pull_request:
-    branches: ["main"]          # PR 열릴 때 => build + preview 배포
+    branches: ["main"]       # PR 열릴 때 => build + preview 배포
     types: [opened, synchronize, reopened, closed]
 
 permissions:
@@ -60,7 +60,7 @@ jobs:
           cat > swagger-initializer.js << 'EOF'
           window.onload = function() {
             window.ui = SwaggerUIBundle({
-              url: "./openapi.json",        // ✅ petstore 제거
+              url: "./openapi.json",      # ✅ petstore 제거
               dom_id: '#swagger-ui',
               presets: [
                 SwaggerUIBundle.presets.apis,
@@ -86,7 +86,7 @@ jobs:
           cat > "$PREVIEW_DIR/swagger-initializer.js" << 'EOF'
           window.onload = function() {
             window.ui = SwaggerUIBundle({
-              url: "./openapi.json",        // ✅ PR 프리뷰도 petstore 제거
+              url: "./openapi.json",      # ✅ PR 프리뷰도 petstore 제거
               dom_id: '#swagger-ui',
               presets: [
                 SwaggerUIBundle.presets.apis,
@@ -112,9 +112,9 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: pr-tmp
-          destination_dir: docs         # ✅ /docs/pr/<num> 아래로 통합 관리
+          destination_dir: docs          # /docs/pr/<num> 아래로 통합 관리
           keep_files: true
-          enable_jekyll: false           # ✅ Jekyll 무효화 (폴더 무시 방지)
+          enable_jekyll: false           # Jekyll 무효화 (폴더 무시 방지)
 
   # ✅ main push일 때만 정식 배포 (→ /docs)
   deploy:
@@ -128,8 +128,8 @@ jobs:
       - id: deployment
         name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
-        with:
-          destination_dir: docs          # ✅ 루트 대신 /docs 에 배포
+        # with:
+        #   destination_dir: docs  # 공식 액션에는 해당 입력이 없으므로 삭제
 
   # ✅ PR 닫히면 해당 PR 폴더만 gh-pages에서 삭제
   cleanup:
