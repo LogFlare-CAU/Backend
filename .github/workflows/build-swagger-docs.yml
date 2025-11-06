@@ -54,15 +54,26 @@ jobs:
           cp -r /tmp/swagger-ui-master/dist/* site/
           rm -rf /tmp/swagger-ui-master /tmp/swagger-ui.zip
           cat > site/swagger-initializer.js << 'EOF'
-          window.onload = function() {
+          window.onload = function () {
+            // 기본값: /docs/openapi.json (repo 하위 경로까지 포함해서 계산)
+            const parts = location.pathname.split('/'); // ["","<user>.github.io" or "", "<repo>", ...]
+            const repoBase = parts.length > 2 ? `/${parts[1]}/${parts[2]}` : '';
+            let specUrl = `${repoBase}/docs/openapi.json`;
+
+            // ?spec= 로 override. 예: /docs/?spec=/\<repo\>/docs/pr/9/openapi.json
+            const params = new URLSearchParams(location.search);
+            const override = params.get('spec');
+            if (override) specUrl = override;
+
+            // 캐시 무효화(선택)
+            const v = params.get('v') || (window.GITHUB_SHA || '');
+            if (v) specUrl += (specUrl.includes('?') ? '&' : '?') + 'v=' + encodeURIComponent(v);
+
             window.ui = SwaggerUIBundle({
-              url: "./openapi.json",
+              url: specUrl,
               dom_id: '#swagger-ui',
-              presets: [
-                SwaggerUIBundle.presets.apis,
-                SwaggerUIStandalonePreset
-              ],
-              layout: "StandaloneLayout"
+              presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+              layout: 'StandaloneLayout'
             });
           };
           EOF
