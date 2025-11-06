@@ -22,7 +22,7 @@ env:
 
 jobs:
   build:
-    # PR closed(정리)일 땐 별도 cleanup 잡이 실행되므로 build는 건너뜀
+    # PR closed(정리)일 땐 build 생략 (미리보기는 GitHub이 자동 종료 처리)
     if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
     steps:
@@ -47,17 +47,16 @@ jobs:
         run: |
           python scripts/export_openapi.py $APP_MODULE
 
-      # ✅ main에 push될 때 정식 문서(/docs) 생성 (중첩 제거: docs/ 바로 아래에 생성)
-      - name: Prepare Swagger UI under /docs (main site)
+      # ===== Main 배포 산출물 준비 =====
+      - name: Prepare Swagger UI under / (main site)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
-          mkdir -p docs
-          cd docs
+          mkdir -p site
           curl -L https://github.com/swagger-api/swagger-ui/archive/refs/heads/master.zip -o /tmp/swagger-ui.zip
           unzip -q /tmp/swagger-ui.zip -d /tmp
-          cp -r /tmp/swagger-ui-master/dist/* .
+          cp -r /tmp/swagger-ui-master/dist/* site/
           rm -rf /tmp/swagger-ui-master /tmp/swagger-ui.zip
-          cat > swagger-initializer.js << 'EOF'
+          cat > site/swagger-initializer.js << 'EOF'
           window.onload = function() {
             window.ui = SwaggerUIBundle({
               url: "./openapi.json",
@@ -70,14 +69,13 @@ jobs:
             });
           };
           EOF
-          cd ..
-          cp openapi.json docs/openapi.json
+          cp openapi.json site/openapi.json
 
-      # ✅ PR일 때: /docs/pr/<번호> 미리보기 생성 (중첩 제거)
-      - name: Prepare PR preview under /docs/pr/<num>
+      # ===== PR 미리보기 산출물 준비 =====
+      - name: Prepare PR preview (root)
         if: github.event_name == 'pull_request' && github.event.pull_request.draft == false && github.event.action != 'closed'
         run: |
-          PREVIEW_DIR="pr-tmp/pr/${{ github.event.number }}"
+          PREVIEW_DIR="preview"
           mkdir -p "$PREVIEW_DIR"
           curl -L https://github.com/swagger-api/swagger-ui/archive/refs/heads/master.zip -o /tmp/swagger-ui.zip
           unzip -q /tmp/swagger-ui.zip -d /tmp
@@ -98,28 +96,23 @@ jobs:
           EOF
           cp openapi.json "$PREVIEW_DIR/openapi.json"
 
-      # ✅ main push 시 Pages artifact 업로드
-      - name: Upload Pages artifact (main deploy)
+      # ===== 아티팩트 업로드 (main) =====
+      - name: Upload Pages artifact (main)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs
+          path: site
 
-      # ✅ PR일 때는 gh-pages 브랜치에 부분 커밋 (keep_files)
-      #     publish_dir=pr-tmp (안에 pr/<num> 구조), destination_dir=docs → 최종 /docs/pr/<num>
-      - name: Push PR preview to gh-pages (keep_files)
+      # ===== 아티팩트 업로드 (PR) =====
+      - name: Upload Pages artifact (PR preview)
         if: github.event_name == 'pull_request' && github.event.pull_request.draft == false && github.event.action != 'closed'
-        uses: peaceiris/actions-gh-pages@v4
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: pr-tmp
-          destination_dir: docs
-          keep_files: true
-          enable_jekyll: false
+          path: preview
 
-  # ✅ main push일 때만 정식 배포 (→ /docs)
   deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # push(main) 또는 PR(미리보기)일 때 배포 실행
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.draft == false && github.event.action != 'closed')
     needs: build
     runs-on: ubuntu-latest
     environment:
@@ -129,22 +122,3 @@ jobs:
       - id: deployment
         name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
-
-  # ✅ PR 닫히면 해당 PR 폴더만 gh-pages에서 삭제
-  cleanup:
-    if: github.event_name == 'pull_request' && github.event.action == 'closed'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout gh-pages
-        uses: actions/checkout@v4
-        with:
-          ref: gh-pages
-
-      - name: Remove docs/pr/<num> and push
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          rm -rf "docs/pr/${{ github.event.number }}"
-          git add -A
-          git commit -m "chore: remove PR preview for #${{ github.event.number }}" || echo "Nothing to commit"
-          git push
