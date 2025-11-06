@@ -5,10 +5,12 @@ from routes.projects import service as project_service
 from . import model, schema
 
 
-async def log_error(conn: AsyncSession, item: schema.ErrorParams) -> model.Errorlog:
-    project = await project_service.get_project_by_name(conn, item.project)
+async def log_error(
+    conn: AsyncSession, projectid, item: schema.ErrorParams
+) -> model.Errorlog:
     newerror = model.Errorlog()
-    newerror.project_id = project.id
+    newerror.project_id = projectid
+    newerror.errortype = item.errortype
     newerror.message = item.message
     newerror.level = item.level
     conn.add(newerror)
