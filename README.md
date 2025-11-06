@@ -132,4 +132,4 @@ async def get_users(request: Request):
 
 ## 🌐 Swagger 문서
 https://logflare-cau.github.io/Backend/docs/  에서 확인 가능합니다.
-https://logflare-cau.github.io/Backend/docs/pr/prnum  에서 확인 가능합니다.
+https://logflare-cau.github.io/Backend/docs/pr/{PR번호}  에서 PR 번호에 대한 스웨거 문서를 확인 가능합니다.
