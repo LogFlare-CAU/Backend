@@ -14,10 +14,11 @@ from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import IntegrityError
 from common.logger_setup import setup_uvicorn_file_logging
 from common.schema import ErrorResponse
+from common.env_utils import getenvval
 from fastapi.responses import JSONResponse
 
 # ===========================================================================
-app = FastAPI()
+app = FastAPI(title="LogFlare API", version="1.0.0")
 setup_uvicorn_file_logging()
 logger = logging.getLogger("logflare")
 # ===========================INCLUE ROUTERS HERE===========================
@@ -108,5 +109,6 @@ async def generic_exception_handler(request: Request, exc: Exception):
 if __name__ == "__main__":
     import uvicorn
 
+    port = getenvval("LOGFLARE_API_PORT", 80)
     logger.info("Server is UP")
-    uvicorn.run(app, host="0.0.0.0", port=8265)
+    uvicorn.run(app, host="0.0.0.0", port=port)
