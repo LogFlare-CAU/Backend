@@ -93,16 +93,17 @@ jobs:
           EOF
           cp openapi.json "$PREVIEW_DIR/openapi.json"
 
-      # ===== 메인 사이트를 gh-pages 루트에 커밋 =====
+      # ===== 메인 사이트를 gh-pages/docs 에 커밋 =====
       - name: Push main site to gh-pages (/docs)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: site
-          destination_dir: docs        # ✅ 여기만 변경
+          destination_dir: docs
           keep_files: true
           enable_jekyll: false
+          force_orphan: false   # ✅ orphan 커밋 금지 (다른 경로 날림 방지)
 
       # ===== PR 미리보기를 gh-pages/docs/pr/<num>에 커밋 =====
       - name: Push PR preview to gh-pages (docs/pr/<num>)
@@ -110,11 +111,12 @@ jobs:
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: pr-tmp/pr/${{ github.event.number }}     # ← 이 폴더를
-          destination_dir: docs/pr/${{ github.event.number }}    # ← 여기에 ‘직접’ 배포
+          publish_dir: pr-tmp/pr/${{ github.event.number }}
+          destination_dir: docs/pr/${{ github.event.number }}
           keep_files: true
           enable_jekyll: false
-          force_orphan: false
+          force_orphan: false   # ✅ PR도 orphan 금지
+
 
   # PR 닫히면 해당 미리보기만 제거
   cleanup:
