@@ -47,7 +47,7 @@ jobs:
         run: |
           python scripts/export_openapi.py $APP_MODULE
 
-      # ✅ main에 push될 때만 정식 문서(/docs) 생성
+      # ✅ main에 push될 때 정식 문서(/docs) 생성
       - name: Prepare Swagger UI under /docs (main site)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
@@ -60,7 +60,7 @@ jobs:
           cat > swagger-initializer.js << 'EOF'
           window.onload = function() {
             window.ui = SwaggerUIBundle({
-              url: "./openapi.json",
+              url: "./openapi.json",        // ✅ petstore 제거
               dom_id: '#swagger-ui',
               presets: [
                 SwaggerUIBundle.presets.apis,
@@ -73,21 +73,33 @@ jobs:
           cd ../..
           cp openapi.json docs/docs/openapi.json
 
-      # ✅ PR일 때: /docs/pr/<번호> 폴더에 미리보기 UI 생성 (루트 덮어쓰지 않음)
+      # ✅ PR일 때: /docs/pr/<번호> 폴더에 미리보기 UI 생성
       - name: Prepare PR preview under /docs/pr/<num>
         if: github.event_name == 'pull_request' && github.event.pull_request.draft == false && github.event.action != 'closed'
         run: |
           PREVIEW_DIR="pr-tmp/docs/pr/${{ github.event.number }}"
           mkdir -p "$PREVIEW_DIR"
-          # swagger UI 다운로드 및 복사
           curl -L https://github.com/swagger-api/swagger-ui/archive/refs/heads/master.zip -o /tmp/swagger-ui.zip
           unzip -q /tmp/swagger-ui.zip -d /tmp
           cp -r /tmp/swagger-ui-master/dist/* "$PREVIEW_DIR"/
           rm -rf /tmp/swagger-ui-master /tmp/swagger-ui.zip
+          cat > "$PREVIEW_DIR/swagger-initializer.js" << 'EOF'
+          window.onload = function() {
+            window.ui = SwaggerUIBundle({
+              url: "./openapi.json",        // ✅ PR 프리뷰도 petstore 제거
+              dom_id: '#swagger-ui',
+              presets: [
+                SwaggerUIBundle.presets.apis,
+                SwaggerUIStandalonePreset
+              ],
+              layout: "StandaloneLayout"
+            });
+          };
+          EOF
           cp openapi.json "$PREVIEW_DIR/openapi.json"
 
-      # ✅ main push 시 Pages artifact 업로드 (정식 문서용)
-      - name: Upload Pages artifact
+      # ✅ main push 시 Pages artifact 업로드
+      - name: Upload Pages artifact (main deploy)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3
         with:
@@ -99,13 +111,12 @@ jobs:
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: pr-tmp/docs/pr/${{ github.event.number }}
-          destination_dir: docs/pr/${{ github.event.number }}   # ✅ 이 줄 추가
+          publish_dir: pr-tmp
+          destination_dir: docs         # ✅ /docs/pr/<num> 아래로 통합 관리
           keep_files: true
+          enable_jekyll: false           # ✅ Jekyll 무효화 (폴더 무시 방지)
 
-
-
-  # ✅ main push일 때만 정식 배포
+  # ✅ main push일 때만 정식 배포 (→ /docs)
   deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: build
@@ -117,6 +128,8 @@ jobs:
       - id: deployment
         name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
+        with:
+          destination_dir: docs          # ✅ 루트 대신 /docs 에 배포
 
   # ✅ PR 닫히면 해당 PR 폴더만 gh-pages에서 삭제
   cleanup:
