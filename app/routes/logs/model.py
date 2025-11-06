@@ -7,16 +7,20 @@ from routes.projects.model import Project
 
 
 class Errorlog(Base):
-    __tablename__ = "errorlog"
+    __tablename__ = "errorlogs"
 
     id = Column(Integer, primary_key=True, autoincrement=True, comment="ID")
     project_id = Column(
         Integer,
-        ForeignKey("project.id", ondelete="CASCADE"),
+        ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=False,
         comment="Project ID",
     )
-    errortype = Column(Text, nullable=False, comment="에러 타입")
+    errortype = Column(
+        Text,
+        nullable=True,
+        comment="에러 타입, 예: ValidationError, 근데 일부 라이브러리의 경우 없음",
+    )
     message = Column(Text, nullable=False, comment="에러 메시지 본문")
     level = Column(Text, nullable=False, comment="에러 레벨 (WARNING, ERROR 등)")
     timestamp = Column(

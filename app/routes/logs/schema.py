@@ -6,9 +6,8 @@ from . import model
 
 
 class ErrorParams(BaseModel):
-    project: str = Field(..., description="프로젝트 명")
+    errortype: str | None = Field(None, description="에러 타입")
     level: str = Field(..., description="로그 레벨")
-    errortype: str = Field(..., description="에러 타입")
     message: str = Field(..., description="에러 메시지")
 
 
