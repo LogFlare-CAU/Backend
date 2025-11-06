@@ -110,10 +110,11 @@ jobs:
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: pr-tmp          # pr-tmp/pr/<num> 구조를 그대로 푸시
-          destination_dir: docs        # gh-pages/docs/pr/<num> 아래에 들어감
+          publish_dir: pr-tmp/pr/${{ github.event.number }}     # ← 이 폴더를
+          destination_dir: docs/pr/${{ github.event.number }}    # ← 여기에 ‘직접’ 배포
           keep_files: true
           enable_jekyll: false
+          force_orphan: false
 
   # PR 닫히면 해당 미리보기만 제거
   cleanup:
