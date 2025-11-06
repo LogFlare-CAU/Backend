@@ -23,29 +23,17 @@ Python 3.12 환경에서 개발 중입니다.
 pip install -r requirements.txt
 ```
 
-### 2. Alembic 환경 구성
+### 2. DB 생성
 
-1. `app/alembic` 으로 이동합니다.
-2. Alembic 초기화:
-
-   ```bash
-   alembic init migrations
-   ```
-
-   `migrations` 대신 원하는 폴더명을 지정해도 됩니다.
-3. `env.py.copy` 파일을 사용하여 `migrations/env.py`를 덮어씁니다.
-
-### 3. 데이터베이스 생성
-
-Alembic을 통해 DB를 생성합니다.
-기본 DB 경로는 `app/db`이며, 이는 `alembic.ini`에서 수정할 수 있습니다.
+동봉된 `init_db.py` 스크립트를 사용하여 초기 데이터베이스를 생성합니다.
 
 ```bash
-alembic revision --autogenerate
-alembic upgrade head
+python init_db.py
 ```
 
-### 4. 실행
+해당 파일을 실행하면 언제든지 초기 DB 상태로 복원할 수 있습니다.
+
+### 3. 실행
 
 추후 `.env` 파일 추가 및 환경 변수 설명이 작성될 예정입니다.
 
