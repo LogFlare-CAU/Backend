@@ -23,7 +23,7 @@ async def authenticate_user(
 
 
 @router.post(
-    "/create",
+    "/",
     response_model=schema.UserResponse,
     responses=r_make([403, 409]),
     dependencies=require_moderator,
@@ -43,7 +43,7 @@ async def create_user(
 
 
 @router.delete(
-    "/delete/{useridx}",
+    "/{useridx}",
     response_model=schema.UserResponse,
     responses=r_make([403, 404]),
     dependencies=require_moderator,

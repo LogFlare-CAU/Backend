@@ -59,11 +59,11 @@ async def create_token(
     token = model.Token(user_idx=user.idx)
     json = {"idx": user.idx, "perm": user.permission}
     if keep_logged:
-        json["exp"] = None
+        json["expire_at"] = -1
     else:
-        json["exp"] = int(time.time()) + 900  # 15 minutes
+        json["expire_at"] = int(time.time()) + 900  # 15 minutes
     token.token = generate_jwt(json)
-    token.exp = json["exp"]
+    token.exp = json["expire_at"]
     conn.add(token)
     await conn.commit()
     await conn.refresh(token)
@@ -76,6 +76,7 @@ async def delete_expired_tokens(conn: AsyncSession) -> None:
         select(model.Token)
         .where(model.Token.exp.isnot(None))
         .where(model.Token.exp < now)
+        .where(model.Token.exp >= 0)
     )
     result = await conn.execute(stmt)
     expired_tokens = result.scalars().all()

@@ -1,6 +1,8 @@
 import logging
 import time
-from fastapi import HTTPException, Security, Depends
+from functools import wraps
+
+from fastapi import HTTPException, Security, Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.status import (
     HTTP_401_UNAUTHORIZED,
@@ -20,7 +22,7 @@ bearer_scheme = HTTPBearer(
     auto_error=False,
     scheme_name="Authorization",
     bearerFormat="Bearer",
-    description="Bearer 토큰 인증 방식입니다.",
+    description="사용자 인증에 쓰이는 Bearer 토큰 인증 방식입니다.",
 )
 
 
@@ -63,8 +65,8 @@ async def _require_login(
             headers={"WWW-Authenticate": "Bearer"},
         ) from e
     # 만료 검증(라이브러리에서 처리 안될 가능성 대비)
-    exp = int(payload.get("exp", 0))
-    if exp and exp < int(time.time()):
+    exp = int(payload.get("expire_at", 0))
+    if exp and int(time.time()) > exp >= 0:
         raise HTTPException(
             status_code=HTTP_401_UNAUTHORIZED,
             detail="Token has expired",
@@ -84,3 +86,15 @@ async def _crosscheck_token(
 
 require_moderator = [Depends(_require_moderator)]
 require_login = [Depends(_require_login)]
+
+
+def get_userid(request: Request) -> int:
+    user = request.headers.get("Authorization", None)
+    if not user:
+        raise HTTPException(HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    token = user.split(" ")[1]
+    try:
+        payload = decode_jwt(token)
+        return payload.get("idx")
+    except Exception:
+        raise HTTPException(HTTP_401_UNAUTHORIZED, detail="Invalid token")
