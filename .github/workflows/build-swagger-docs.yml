@@ -77,10 +77,10 @@ jobs:
         run: |
           PREVIEW_DIR="docs/docs/pr/${{ github.event.number }}"
           mkdir -p "$PREVIEW_DIR"
-          # swagger UI 복사
-          cp -r docs/docs/* "$PREVIEW_DIR"/ --exclude=pr
-          # 루트용 openapi.json이 섞이지 않게 PR 전용 openapi.json로 교체
+          # docs/docs → PREVIEW_DIR 로 복사하되 pr/ 폴더는 제외(자기 자신 복사 방지)
+          rsync -a --delete --exclude 'pr' docs/docs/ "$PREVIEW_DIR"/
           cp openapi.json "$PREVIEW_DIR/openapi.json"
+
 
       # ⬇️ 이제 push(main) 뿐 아니라 PR 이벤트(초안 제외)에서도 아티팩트를 올림
       - name: Upload Pages artifact
