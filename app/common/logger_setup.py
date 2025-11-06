@@ -5,13 +5,14 @@ FMT = "%(asctime)s:%(levelname)s:%(name)s:%(message)s"
 CONSOLE_FMT = "%(levelname)s:%(message)s"
 DATEFMT = "%Y-%m-%d %H:%M:%S"
 
+
 def setup_uvicorn_file_logging() -> None:
     # ← 여기서 관련 로거들을 모두 포함
     target_names = (
         "uvicorn",
         "uvicorn.error",
         "uvicorn.access",
-        "logflare",                       # 프로젝트 공통 로거
+        "logflare",  # 프로젝트 공통 로거
     )
     targets = [logging.getLogger(n) for n in target_names]
 
@@ -43,4 +44,3 @@ def setup_uvicorn_file_logging() -> None:
             lg.propagate = False
             lg.setLevel(logging.INFO)
             lg._logflare_configured = True
-
