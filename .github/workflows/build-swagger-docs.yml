@@ -4,7 +4,8 @@ on:
   push:
     branches: ["main"]          # main에 push될 때 => build + deploy
   pull_request:
-    branches: ["main"]          # PR 열릴 때 => build만
+    branches: ["main"]          # PR 열릴 때 => build + preview 배포
+    types: [opened, synchronize, reopened, closed]
 
 permissions:
   contents: read
@@ -21,9 +22,8 @@ env:
 
 jobs:
   build:
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    # PR이 아닌 이벤트(= main에 push)에서는 항상 실행,
-    # PR 이벤트인 경우에만 draft가 아닐 때 실행
+    # PR closed(정리)일 땐 별도 cleanup 잡이 실행되므로 build는 건너뜀
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -47,7 +47,7 @@ jobs:
         run: |
           python scripts/export_openapi.py $APP_MODULE
 
-      - name: Prepare Swagger UI under /docs
+      - name: Prepare Swagger UI under /docs (main site)
         run: |
           mkdir -p docs/docs
           cd docs/docs
@@ -68,19 +68,30 @@ jobs:
             });
           };
           EOF
-          grep -q "./openapi.json" swagger-initializer.js || (echo "initializer 교체 실패" && exit 1)
           cd ../..
           cp openapi.json docs/docs/openapi.json
 
-      # 아티팩트 업로드는 배포 때만 필요
+      # ⬇️ PR일 때, /docs/pr/<번호> 경로에도 동일한 정적 UI + 해당 PR의 openapi.json을 생성
+      - name: Prepare PR preview under /docs/pr/<num>
+        if: github.event_name == 'pull_request' && github.event.pull_request.draft == false && github.event.action != 'closed'
+        run: |
+          PREVIEW_DIR="docs/docs/pr/${{ github.event.number }}"
+          mkdir -p "$PREVIEW_DIR"
+          # swagger UI 복사
+          cp -r docs/docs/* "$PREVIEW_DIR"/ --exclude=pr
+          # 루트용 openapi.json이 섞이지 않게 PR 전용 openapi.json로 교체
+          cp openapi.json "$PREVIEW_DIR/openapi.json"
+
+      # ⬇️ 이제 push(main) 뿐 아니라 PR 이벤트(초안 제외)에서도 아티팩트를 올림
       - name: Upload Pages artifact
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.draft == false && github.event.action != 'closed')
         uses: actions/upload-pages-artifact@v3
         with:
           path: docs
 
+  # ⬇️ main push 또는 PR(초안 아님)에서 배포
   deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.draft == false && github.event.action != 'closed')
     needs: build
     runs-on: ubuntu-latest
     environment:
@@ -89,4 +100,58 @@ jobs:
     steps:
       - id: deployment
         name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v4
+
+  # ⬇️ PR 닫히면 해당 pr 폴더 제거(= 없는 상태로 다시 빌드/배포)
+  cleanup:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Rebuild main docs (without PR folder)
+        run: |
+          rm -rf docs
+          mkdir -p docs/docs
+          cd docs/docs
+          curl -L https://github.com/swagger-api/swagger-ui/archive/refs/heads/master.zip -o swagger-ui.zip
+          unzip -q swagger-ui.zip
+          cp -r swagger-ui-master/dist/* .
+          rm -rf swagger-ui-master swagger-ui.zip
+          cat > swagger-initializer.js << 'EOF'
+          window.onload = function() {
+            window.ui = SwaggerUIBundle({
+              url: "./openapi.json",
+              dom_id: '#swagger-ui',
+              presets: [
+                SwaggerUIBundle.presets.apis,
+                SwaggerUIStandalonePreset
+              ],
+              layout: "StandaloneLayout"
+            });
+          };
+          EOF
+          cd ../..
+          python scripts/export_openapi.py $APP_MODULE
+          cp openapi.json docs/docs/openapi.json
+          # PR 폴더를 명시적으로 지우고 싶다면 아래 줄 유지(다음 줄은 안전상 남김)
+          rm -rf "docs/docs/pr/${{ github.event.number }}" || true
+
+      - name: Upload Pages artifact (cleanup)
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - name: Deploy to GitHub Pages (cleanup)
         uses: actions/deploy-pages@v4
