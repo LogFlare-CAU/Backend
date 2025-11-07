@@ -944,7 +944,7 @@
           "data": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__LogFileDTO__2"
+                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__LogFileDTO"
               },
               {
                 "type": "null"
@@ -1275,6 +1275,17 @@
             "type": "string",
             "title": "File Name",
             "description": "로그 파일 이름"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "project 관계"
           }
         },
         "type": "object",
@@ -1287,7 +1298,7 @@
         "title": "LogFileDTO",
         "description": "LogFileDTO"
       },
-      "common__schema__sqlalchemy_orm_converter__LogFileDTO__2": {
+      "common__schema__sqlalchemy_orm_converter__LogFileDTO__1": {
         "properties": {
           "id": {
             "type": "integer",
@@ -1308,17 +1319,6 @@
             "type": "string",
             "title": "File Name",
             "description": "로그 파일 이름"
-          },
-          "project": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "project 관계"
           }
         },
         "type": "object",
@@ -1414,7 +1414,7 @@
           },
           "logfiles": {
             "items": {
-              "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__LogFileDTO"
+              "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__LogFileDTO__1"
             },
             "type": "array",
             "title": "Logfiles",
