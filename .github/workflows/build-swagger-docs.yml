@@ -109,12 +109,13 @@ jobs:
         with:
           issue-number: ${{ github.event.number }}
           body: |
-            🧩 **Swagger Preview**
-            - Main spec: `https://raw.githubusercontent.com/${{ github.repository }}/openapi-jsons/openapi.json`
-            - This PR spec: `https://raw.githubusercontent.com/${{ github.repository }}/openapi-jsons/pr/${{ github.event.number }}/openapi.json`
-            - Viewer:
-              - Main: (메인은 여기에서)[https://macqueen0987.github.io/swagger-viewer/?spec=https://raw.githubusercontent.com/${{ github.repository }}/openapi-jsons/openapi.json]
-              - This PR: (이 PR은 여기에서)[https://macqueen0987.github.io/swagger-viewer/?spec=https://raw.githubusercontent.com/${{ github.repository }}/openapi-jsons/pr/${{ github.event.number }}/openapi.json]
+            ## 🧩 Swagger API Preview
+
+            **🌐 Main Branch**
+            👉 [메인 스펙 보러 가기](https://macqueen0987.github.io/swagger-viewer/?spec=https://raw.githubusercontent.com/LogFlare-CAU/Backend/openapi-jsons/openapi.json)
+
+            **🚀 This Pull Request**
+            👉 [이 PR 스펙 보러 가기](https://macqueen0987.github.io/swagger-viewer/?spec=https://raw.githubusercontent.com/LogFlare-CAU/Backend/openapi-jsons/pr/${{ github.event.number }}/openapi.json)
 
   # PR 닫히면 해당 pr/<num> 제거
 #  pr-cleanup:
