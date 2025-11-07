@@ -119,5 +119,4 @@ async def get_users(request: Request):
 * 모든 API는 `common.schema.APIResponse`를 상속하거나 `response_maker`를 통해 일관된 응답을 보장합니다.
 
 ## 🌐 Swagger 문서
-https://logflare-cau.github.io/Backend/docs/  에서 확인 가능합니다.   
-https://logflare-cau.github.io/Backend/docs/pr/{PR번호}  에서 PR 번호에 대한 스웨거 문서를 확인 가능합니다.
+[이곳에서 확인 가능합니다.](https://macqueen0987.github.io/swagger-viewer/?spec=https://raw.githubusercontent.com/LogFlare-CAU/Backend/openapi-jsons/openapi.json)
