@@ -862,7 +862,7 @@
           "project": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO"
+                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO__2"
               },
               {
                 "type": "null"
@@ -1000,7 +1000,7 @@
           "data": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO__1"
+                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO"
               },
               {
                 "type": "null"
@@ -1043,7 +1043,7 @@
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO__1"
+                  "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO"
                 },
                 "type": "array"
               },
@@ -1279,7 +1279,7 @@
           "project": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO"
+                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO__2"
               },
               {
                 "type": "null"
@@ -1366,6 +1366,14 @@
             ],
             "title": "Description",
             "description": "프로젝트 설명, 이것도 사용할지는 모르겠습니다"
+          },
+          "logfiles": {
+            "items": {
+              "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__LogFileDTO__1"
+            },
+            "type": "array",
+            "title": "Logfiles",
+            "description": "logfiles 관계"
           }
         },
         "type": "object",
@@ -1376,7 +1384,7 @@
         "title": "ProjectDTO",
         "description": "ProjectDTO"
       },
-      "common__schema__sqlalchemy_orm_converter__ProjectDTO__1": {
+      "common__schema__sqlalchemy_orm_converter__ProjectDTO__2": {
         "properties": {
           "id": {
             "type": "integer",
@@ -1411,14 +1419,6 @@
             ],
             "title": "Description",
             "description": "프로젝트 설명, 이것도 사용할지는 모르겠습니다"
-          },
-          "logfiles": {
-            "items": {
-              "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__LogFileDTO__1"
-            },
-            "type": "array",
-            "title": "Logfiles",
-            "description": "logfiles 관계"
           }
         },
         "type": "object",
