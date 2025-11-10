@@ -6,14 +6,6 @@ from . import service, schema
 from routes.projects import application as project_app
 
 
-async def log_error(
-    conn: AsyncSession, projectid: int, log: schema.ErrorParams
-) -> None:
-    res = await service.log_error(conn, projectid, log)
-    # TODO: push notificatoin using firebase or other service
-    return
-
-
 async def get_errors(
     conn: AsyncSession, userid: int, projectid: int, limit: int, offset: int
 ) -> schema.ErrorSequenceResponse:

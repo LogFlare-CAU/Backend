@@ -15,12 +15,14 @@ from sqlalchemy.exc import IntegrityError
 from common.logger_setup import setup_uvicorn_file_logging
 from common.schema import ErrorResponse
 from common.env_utils import getenvval
+from common.fcm import init as fcm_init
 from fastapi.responses import JSONResponse
 
 # ===========================================================================
 app = FastAPI(title="LogFlare API", version="1.0.0")
 setup_uvicorn_file_logging()
 logger = logging.getLogger("logflare")
+fcm_init()
 # ===========================INCLUE ROUTERS HERE===========================
 from routes import user, projects, logs
 

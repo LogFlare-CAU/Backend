@@ -2,7 +2,8 @@ from typing import Sequence
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, delete
+from sqlalchemy.orm import selectinload
 from . import schema, model
 import secrets
 from common.jwt_utils import generate_jwt
@@ -34,10 +35,13 @@ async def delete_project(conn: AsyncSession, project_id: int) -> None:
     await conn.commit()
 
 
-async def get_project(conn: AsyncSession, project_id: int) -> model.Project:
-    result = await conn.execute(
-        select(model.Project).where(model.Project.id == project_id)
-    )
+async def get_project(
+    conn: AsyncSession, project_id: int, load: bool = False
+) -> model.Project:
+    stmt = select(model.Project).where(model.Project.id == project_id)
+    if load:
+        stmt = stmt.options(selectinload(model.Project.logfiles))
+    result = await conn.execute(stmt)
     project = result.scalars().first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -72,6 +76,22 @@ async def add_logfile(
     conn.add(logfile)
     await conn.commit()
     await conn.refresh(logfile)
+    return logfile
+
+
+async def delete_logfile(
+    conn: AsyncSession, projectid: int, logfileid: int
+) -> model.LogFile:
+    stmt = select(model.LogFile).where(
+        model.LogFile.id == logfileid,
+        model.LogFile.project_id == projectid,
+    )
+    result = await conn.execute(stmt)
+    logfile = result.scalars().first()
+    if not logfile:
+        raise HTTPException(status_code=404, detail="LogFile not found")
+    await conn.delete(logfile)
+    await conn.commit()
     return logfile
 
 

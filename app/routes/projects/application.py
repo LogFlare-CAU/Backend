@@ -38,7 +38,7 @@ async def get_projects(conn: AsyncSession, userid: int) -> Sequence[model.Projec
     project_ids = [perm.project_id for perm in perms]
     returnval = []
     for project_id in project_ids:
-        project = await service.get_project(conn, project_id)
+        project = await service.get_project(conn, project_id, load=True)
         if project:
             returnval.append(project)
     return returnval
