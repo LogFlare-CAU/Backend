@@ -64,3 +64,15 @@ async def add_logfile(
 ):
     res = await application.add_logfile(conn, projectid, item)
     return APIResponse(data=dict(res))
+
+
+@router.delete(
+    "/{projectid}/logfile/{logfileid}",
+    summary="로그파일 삭제",
+    dependencies=require_moderator,
+    responses=rm([401, 403, 404]),
+    response_model=schema.LogFileResponse,
+)
+async def delete_logfile(request: Request, projectid: int, logfileid: int, conn=get_db):
+    res = await service.delete_logfile(conn, projectid, logfileid)
+    return APIResponse(data=dict(res))
