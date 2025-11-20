@@ -6,6 +6,23 @@ CONSOLE_FMT = "%(levelname)s:%(message)s"
 DATEFMT = "%Y-%m-%d %H:%M:%S"
 
 
+def get_logger(name="logflare") -> logging.Logger:
+    logger = logging.getLogger("logflare")
+    if not getattr(logger, "_logflare_configured", False):
+        formatter = logging.Formatter(FMT, DATEFMT)
+
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        console_handler.setFormatter(formatter)
+
+        logger.addHandler(console_handler)
+        logger.propagate = False
+        logger.setLevel(logging.INFO)
+        logger._logflare_configured = True
+
+    return logger
+
+
 def setup_uvicorn_file_logging() -> None:
     # ← 여기서 관련 로거들을 모두 포함
     target_names = (

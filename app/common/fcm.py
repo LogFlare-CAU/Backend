@@ -1,9 +1,9 @@
 from .env_utils import getenvval
 import firebase_admin
 from firebase_admin import credentials, messaging
-import logging
+from common.logger_setup import get_logger
 
-logger = logging.getLogger("logflare")
+logger = get_logger()
 
 
 def init():
