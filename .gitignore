@@ -4,3 +4,4 @@ Dockerfile
 *.sqlite
 *.env
 __pycache__
+google-services.json
