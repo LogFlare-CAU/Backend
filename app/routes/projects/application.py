@@ -3,14 +3,14 @@ from typing import Any, Coroutine, Sequence
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.status import HTTP_400_BAD_REQUEST
-from common.enums import Permissions
 from routes.user import service as user_service
-from . import schema, service, model
 from fastapi import HTTPException
 import os
-from pathlib import Path
+from common.enums import Permissions
+from common.logger_setup import get_logger
+from . import schema, service, model
 
-logger = logging.getLogger("logflare")
+logger = get_logger()
 
 
 async def add_logfile(
