@@ -11,12 +11,13 @@ from starlette.status import (
 )
 from common.enums import Permissions
 from common.jwt_utils import decode_jwt
+from common.logger_setup import get_logger
 from . import service
 
 """
 여기에서는 사용자의 토큰 검증을 하는 종속성을 정의합니다.
 """
-logger = logging.getLogger("logflare")
+logger = get_logger()
 
 bearer_scheme = HTTPBearer(
     auto_error=False,

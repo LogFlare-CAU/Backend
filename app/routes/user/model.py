@@ -1,5 +1,5 @@
 from common.basemodel import Base
-from sqlalchemy import Column, Integer, String, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime
 
 
 class User(Base):
@@ -28,15 +28,3 @@ class Token(Base):
         comment="사용자 고유번호",
     )
     exp = Column(Integer, nullable=True, comment="토큰 만료 시간(UNIX TIMESTAMP)")
-
-
-class FCMToken(Base):
-    __tablename__ = "fcm_tokens"
-    idx = Column(Integer, primary_key=True, autoincrement=True)
-    fcm_token = Column(Text, nullable=False, comment="FCM 토큰")
-    user_idx = Column(
-        Integer,
-        ForeignKey("users.idx", ondelete="CASCADE"),
-        nullable=False,
-        comment="사용자 고유번호",
-    )

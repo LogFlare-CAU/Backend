@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.status import HTTP_409_CONFLICT, HTTP_404_NOT_FOUND
 from common.jwt_utils import generate_jwt
 from common.security import hash_password
+from datetime import datetime, UTC
 from . import model, schema
 
 
@@ -23,7 +24,11 @@ async def create_user(conn: AsyncSession, item: schema.UserCreateParams) -> mode
     existing_user = result.scalar_one_or_none()
     if existing_user:
         raise HTTPException(HTTP_409_CONFLICT)
-    user = model.User(username=item.username, password=hash_password(item.password))
+    user = model.User(
+        username=item.username,
+        password=hash_password(item.password),
+        permission=item.permission,
+    )
     conn.add(user)
     await conn.commit()
     await conn.refresh(user)
