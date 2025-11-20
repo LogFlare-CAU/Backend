@@ -4,7 +4,7 @@ from common.sqlsession import get_db
 from common.schema import response_maker as rm, APIResponse
 from routes.projects.authenticate import require_project_auth, get_project_id
 from routes.user.authenticate import require_login, get_userid
-from . import schema, application, service, backgroundtasks
+from . import schema, application, service, tasks
 
 router = APIRouter(prefix="/log", tags=["log"])
 
@@ -12,6 +12,24 @@ router = APIRouter(prefix="/log", tags=["log"])
 @router.get("/")
 async def health_check():
     return {"status": "ok"}
+
+
+@router.get(
+    "/{project_id}/{logfileid}",
+    dependencies=require_login,
+    summary="로그 파일 조회",
+    responses=rm([401, 403, 404]),
+)
+async def get_logfile(
+    request: Request,
+    project_id: int,
+    logfile: int,
+    limit: int = 50,
+    offset: int = 0,
+    conn=get_db,
+):
+    """ """
+    userid = get_userid(request)
 
 
 @router.post(
