@@ -1,36 +1,47 @@
-import asyncio
-import logging
 import traceback
+from contextlib import asynccontextmanager
 from typing import Optional, Any
-
 from fastapi import (
     FastAPI,
     Request,
     status,
     HTTPException as FastAPIHTTPException,
 )
-from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
-from common.logger_setup import setup_uvicorn_file_logging
-from common.schema import ErrorResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from common.env_utils import getenvval
 from common.fcm import init as fcm_init
-from fastapi.responses import JSONResponse
+from common.logger_setup import setup_uvicorn_file_logging, get_logger
+from common.schema import ErrorResponse
 
 # ===========================================================================
-app = FastAPI(title="LogFlare API", version="1.0.0")
+title = "LogFlare API"
+version = "1.0.0"
+description = "LogFlare API 서버"
+# ===============================공통 초기화================================
 setup_uvicorn_file_logging()
-logger = logging.getLogger("logflare")
+logger = get_logger()
 fcm_init()
 # ===========================INCLUE ROUTERS HERE===========================
-from routes import user, projects, logs
+from routes import user, projects, logs, fcm
 
-asyncio.run(user.init_superuser())
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 앱 시작 시 초기화 작업
+    fcm.init()
+    await user.init_superuser()
+    yield
+    # 앱 종료 시 정리 작업
+
+
+app = FastAPI(title=title, version=version, description=description, lifespan=lifespan)
 app.include_router(user.router)
 app.include_router(projects.router)
 app.include_router(logs.router)
+app.include_router(fcm.router)
 # ===========================================================================
 
 
@@ -107,7 +118,6 @@ async def generic_exception_handler(request: Request, exc: Exception):
 
 
 # ===========================================================================
-
 if __name__ == "__main__":
     import uvicorn
 
