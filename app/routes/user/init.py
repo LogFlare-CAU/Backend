@@ -1,3 +1,4 @@
+from common.logger_setup import get_logger
 from . import model, service
 from common.sqlsession import async_session
 from common import getenvval, hash_password
@@ -5,7 +6,7 @@ from common.enums import Permissions
 import logging
 
 
-logger = logging.getLogger("logflare")
+logger = get_logger()
 
 
 async def init_superuser():

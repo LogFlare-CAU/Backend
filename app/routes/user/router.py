@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request, Depends
 from common.schema import APIResponse, response_maker as r_make, StringResponse
 from common.sqlsession import get_db
 from . import model, schema, application, service
-from .authenticate import require_moderator
+from .authenticate import require_moderator, require_login, get_userid
 
 router = APIRouter(prefix="/user", tags=["user"])
 
