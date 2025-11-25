@@ -584,6 +584,82 @@
         }
       }
     },
+    "/project/perm": {
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "프로젝트 권한 부여",
+        "operationId": "grant_project_perms_project_perm_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectPermsParams"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectPermsResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Authorization": []
+          }
+        ]
+      }
+    },
     "/log/": {
       "get": {
         "tags": [
@@ -609,7 +685,7 @@
           "log"
         ],
         "summary": "로그 파일 조회",
-        "operationId": "get_logfile_log__project_id___logfileid__get",
+        "operationId": "read_log_log__project_id___logfileid__get",
         "security": [
           {
             "Authorization": []
@@ -626,12 +702,12 @@
             }
           },
           {
-            "name": "logfile",
-            "in": "query",
+            "name": "logfileid",
+            "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
-              "title": "Logfile"
+              "title": "Logfileid"
             }
           },
           {
@@ -660,7 +736,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/StringResponse"
+                }
               }
             }
           },
@@ -1384,7 +1462,7 @@
           "data": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__LogFileDTO__2"
+                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__LogFileDTO"
               },
               {
                 "type": "null"
@@ -1410,6 +1488,101 @@
           "name"
         ],
         "title": "ProjectCreateParams"
+      },
+      "ProjectPermsDTO": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "ID"
+          },
+          "project_id": {
+            "type": "integer",
+            "title": "Project Id",
+            "description": "프로젝트 ID"
+          },
+          "user_id": {
+            "type": "integer",
+            "title": "User Id",
+            "description": "유저 ID"
+          },
+          "view": {
+            "type": "boolean",
+            "title": "View",
+            "description": "뷰 권한"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "project_id",
+          "user_id",
+          "view"
+        ],
+        "title": "ProjectPermsDTO",
+        "description": "ProjectPermsDTO"
+      },
+      "ProjectPermsParams": {
+        "properties": {
+          "userid": {
+            "type": "integer",
+            "title": "Userid",
+            "description": "유저 ID"
+          },
+          "projectid": {
+            "type": "integer",
+            "title": "Projectid",
+            "description": "프로젝트 ID"
+          }
+        },
+        "type": "object",
+        "required": [
+          "userid",
+          "projectid"
+        ],
+        "title": "ProjectPermsParams"
+      },
+      "ProjectPermsResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "API 호출 성공 여부",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "처리 결과에 대한 메시지",
+            "default": "success"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code",
+            "description": "에러 코드"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProjectPermsDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "API 호출 결과 데이터"
+          }
+        },
+        "type": "object",
+        "title": "ProjectPermsResponse",
+        "description": "ProjectPermsResponse"
       },
       "ProjectResponse": {
         "properties": {
@@ -1843,12 +2016,23 @@
           "file_path": {
             "type": "string",
             "title": "File Path",
-            "description": "로그 파일 경로"
+            "description": "로그 파일 경로 (서버 상 실제 경로, 파일명 포함)"
           },
           "file_name": {
             "type": "string",
             "title": "File Name",
-            "description": "로그 파일 이름"
+            "description": "로그 파일 이름 (보이는 용도)"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "project 관계"
           }
         },
         "type": "object",
@@ -1861,7 +2045,7 @@
         "title": "LogFileDTO",
         "description": "LogFileDTO"
       },
-      "common__schema__sqlalchemy_orm_converter__LogFileDTO__2": {
+      "common__schema__sqlalchemy_orm_converter__LogFileDTO__1": {
         "properties": {
           "id": {
             "type": "integer",
@@ -1876,23 +2060,12 @@
           "file_path": {
             "type": "string",
             "title": "File Path",
-            "description": "로그 파일 경로"
+            "description": "로그 파일 경로 (서버 상 실제 경로, 파일명 포함)"
           },
           "file_name": {
             "type": "string",
             "title": "File Name",
-            "description": "로그 파일 이름"
-          },
-          "project": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "project 관계"
+            "description": "로그 파일 이름 (보이는 용도)"
           }
         },
         "type": "object",
@@ -1988,7 +2161,7 @@
           },
           "logfiles": {
             "items": {
-              "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__LogFileDTO"
+              "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__LogFileDTO__1"
             },
             "type": "array",
             "title": "Logfiles",
