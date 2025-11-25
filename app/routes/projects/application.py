@@ -3,14 +3,14 @@ from typing import Any, Coroutine, Sequence
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.status import HTTP_400_BAD_REQUEST
-from common.enums import Permissions
 from routes.user import service as user_service
-from . import schema, service, model
 from fastapi import HTTPException
 import os
-from pathlib import Path
+from common.enums import Permissions
+from common.logger_setup import get_logger
+from . import schema, service, model
 
-logger = logging.getLogger("logflare")
+logger = get_logger()
 
 
 async def add_logfile(
@@ -38,7 +38,7 @@ async def get_projects(conn: AsyncSession, userid: int) -> Sequence[model.Projec
     project_ids = [perm.project_id for perm in perms]
     returnval = []
     for project_id in project_ids:
-        project = await service.get_project(conn, project_id)
+        project = await service.get_project(conn, project_id, load=True)
         if project:
             returnval.append(project)
     return returnval

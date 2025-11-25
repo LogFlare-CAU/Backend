@@ -14,8 +14,14 @@ class LogFileCreateParams(BaseModel):
     path: str = Field(..., description="파일 절대 경로")
 
 
+class ProjectPermsParams(BaseModel):
+    userid: int = Field(..., description="유저 ID")
+    projectid: int = Field(..., description="프로젝트 ID")
+
+
 ProjectResponse = make_named_response(model.Project, "ProjectResponse")
 ProjectSequenceResponse = make_named_response(
     Sequence[model.Project], "ProjectSequenceResponse"
 )
 LogFileResponse = make_named_response(model.LogFile, "LogFileResponse")
+ProjectPermsResponse = make_named_response(model.ProjectPerms, "ProjectPermsResponse")

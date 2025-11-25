@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, BackgroundTasks
 from fastapi.responses import Response
 from common.sqlsession import get_db
-from common.schema import response_maker as rm, APIResponse
+from common.schema import response_maker as rm, APIResponse, StringResponse
 from routes.projects.authenticate import require_project_auth, get_project_id
 from routes.user.authenticate import require_login, get_userid
-from . import schema, application, service
+from . import schema, application, service, tasks
 
 router = APIRouter(prefix="/log", tags=["log"])
 
@@ -14,6 +14,27 @@ async def health_check():
     return {"status": "ok"}
 
 
+@router.get(
+    "/{project_id}/{logfileid}",
+    dependencies=require_login,
+    summary="로그 파일 조회",
+    responses=rm([401, 403, 404]),
+    response_model=StringResponse,
+)
+async def read_log(
+    request: Request,
+    project_id: int,
+    logfileid: int,
+    limit: int = 50,
+    offset: int = 0,
+    conn=get_db,
+):
+    """ """
+    userid = get_userid(request)
+    res = await application.read_log(conn, project_id, userid, logfileid, limit, offset)
+    return StringResponse(data=res)
+
+
 @router.post(
     "/error",
     status_code=204,
@@ -21,7 +42,12 @@ async def health_check():
     dependencies=require_project_auth,
     responses=rm([401, 403, 404]),
 )
-async def log_error(request: Request, log: schema.ErrorParams, conn=get_db):
+async def log_error(
+    request: Request,
+    log: schema.ErrorParams,
+    bg_tasks: BackgroundTasks,
+    conn=get_db,
+):
     """
     타 코드에서 발생한 에러 로그를 수신하는 엔드포인트<br>
     <br>
@@ -31,7 +57,8 @@ async def log_error(request: Request, log: schema.ErrorParams, conn=get_db):
     204: 로그 수신 성공
     """
     projectid = get_project_id(request)
-    await application.log_error(conn, projectid, log)
+    error = await service.log_error(conn, projectid, log)
+    bg_tasks.add_task(tasks.notify_error, error=error)
     return Response()
 
 
