@@ -76,3 +76,17 @@ async def add_logfile(
 async def delete_logfile(request: Request, projectid: int, logfileid: int, conn=get_db):
     res = await service.delete_logfile(conn, projectid, logfileid)
     return APIResponse(data=dict(res))
+
+
+@router.post(
+    "/perm",
+    summary="프로젝트 권한 부여",
+    dependencies=require_moderator,
+    responses=rm([401, 403, 404]),
+    response_model=schema.ProjectPermsResponse,
+)
+async def grant_project_perms(
+    request: Request, item: schema.ProjectPermsParams, conn=get_db
+):
+    res = await service.grant_project_perms(conn, item)
+    return APIResponse(data=dict(res))

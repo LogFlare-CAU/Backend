@@ -95,6 +95,20 @@ async def delete_logfile(
     return logfile
 
 
+async def get_logfile(
+    conn: AsyncSession, projectid: int, logfileid: int
+) -> model.LogFile:
+    stmt = select(model.LogFile).where(
+        model.LogFile.id == logfileid,
+        model.LogFile.project_id == projectid,
+    )
+    result = await conn.execute(stmt)
+    logfile = result.scalars().first()
+    if not logfile:
+        raise HTTPException(status_code=404, detail="LogFile not found")
+    return logfile
+
+
 async def list_projects(conn: AsyncSession) -> Sequence[model.Project]:
     result = await conn.execute(select(model.Project))
     projects = result.scalars().all()
@@ -107,4 +121,25 @@ async def get_project_perms(
     stmt = select(model.ProjectPerms).where(model.ProjectPerms.user_id == userid)
     result = await conn.execute(stmt)
     perms = result.scalars().all()
+    return perms
+
+
+async def grant_project_perms(
+    conn: AsyncSession, item: schema.ProjectPermsParams
+) -> model.ProjectPerms:
+    stmt = select(model.ProjectPerms).where(
+        model.ProjectPerms.user_id == item.user_id,
+        model.ProjectPerms.project_id == item.project_id,
+    )
+    result = await conn.execute(stmt)
+    perms = result.scalars().first()
+    if perms:
+        perms.view = True
+        return perms
+    perms = model.ProjectPerms(
+        user_id=item.user_id, project_id=item.project_id, view=True
+    )
+    conn.add(perms)
+    await conn.commit()
+    await conn.refresh(perms)
     return perms
