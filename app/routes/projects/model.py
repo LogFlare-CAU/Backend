@@ -19,7 +19,7 @@ class Project(Base):
         "LogFile",
         back_populates="project",
         cascade="all, delete-orphan",
-        passive_deletes=True,  # SQLite일 때 ondelete 동작에 도움
+        passive_deletes=True,
         lazy="selectin",
     )
 
@@ -29,12 +29,14 @@ class LogFile(Base):
     id = Column(Integer, primary_key=True, autoincrement=True, comment="ID")
     project_id = Column(
         Integer,
-        ForeignKey("projects.id", ondelete="CASCADE"),  # ← 테이블명 단수→복수로 수정
+        ForeignKey("projects.id", ondelete="CASCADE"),
         nullable=False,
         comment="프로젝트 ID",
     )
-    file_path = Column(Text, nullable=False, comment="로그 파일 경로")
-    file_name = Column(Text, nullable=False, comment="로그 파일 이름")
+    file_path = Column(
+        Text, nullable=False, comment="로그 파일 경로 (서버 상 실제 경로, 파일명 포함)"
+    )
+    file_name = Column(Text, nullable=False, comment="로그 파일 이름 (보이는 용도)")
     project = relationship(
         "Project",
         back_populates="logfiles",
