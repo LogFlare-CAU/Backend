@@ -28,7 +28,7 @@ async def list_projects(request: Request, conn=get_db):
     summary="새로운 프로젝트 생성",
     dependencies=require_moderator,
     responses=rm([401, 403, 409]),
-    response_model=StringResponse,
+    response_model=schema.ProjectResponseWithToken,
 )
 async def create_project(
     request: Request, items: schema.ProjectCreateParams, conn=get_db
@@ -37,7 +37,7 @@ async def create_project(
     새로운  프로젝트를 생성합니다. 프로젝트 생성에 성공하면 프로젝트 토큰을 반환합니다.
     """
     project = await service.create_project(conn, items)
-    return APIResponse(data=project.token)
+    return APIResponse(data=project)
 
 
 @router.delete(
@@ -90,3 +90,21 @@ async def grant_project_perms(
 ):
     res = await service.grant_project_perms(conn, item)
     return APIResponse(data=dict(res))
+
+
+@router.post(
+    "/perm/batch/reset",
+    summary="프로젝트 권한 일괄 재설정",
+    dependencies=require_moderator,
+    responses=rm([401, 403, 404]),
+    response_model=schema.ProjectPermsSequenceResponse,
+)
+async def reset_project_perms_batch(
+    request: Request, item: schema.ProjectPermsBatchParams, conn=get_db
+):
+    """
+    프로젝트에 대한 권한을  일괄 재설정합니다.<br>
+    기존에 부여된 모든 권한을 제거하고, 새로운 권한 목록으로 설정합니다.
+    """
+    res = await service.reset_project_perms_batch(conn, item)
+    return APIResponse(data=[dict(perm) for perm in res])

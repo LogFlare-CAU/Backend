@@ -1,3 +1,5 @@
+from typing import Sequence
+
 from pydantic import BaseModel, Field
 
 from common.schema import make_named_response
@@ -18,3 +20,4 @@ class UserCreateParams(BaseModel):
 
 
 UserResponse = make_named_response(User, "UserResponse")
+UserSequenceResponse = make_named_response(Sequence[User], "UserSequenceResponse")
