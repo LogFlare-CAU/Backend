@@ -1,3 +1,7 @@
+from collections.abc import Coroutine
+from typing import Callable, Any
+
+from firebase_admin.messaging import UnregisteredError as FCMUnregisteredError
 from .env_utils import getenvval
 import firebase_admin
 from firebase_admin import credentials, messaging
@@ -21,15 +25,13 @@ def init():
         )
 
 
-def send_fcm_message(token, title, body, data=None):
-    """
-    FCM 토큰으로 푸시 알림을 보냅니다.
-    :param token: 수신자의 FCM 토큰
-    :param title: 알림 제목
-    :param body: 알림 본문
-    :param data: 추가 데이터 (딕셔너리 형태)
-    :return: 메시지 전송 결과
-    """
+async def send_fcm_message(
+    token: str,
+    title: str,
+    body: str,
+    data: dict | None = None,
+    onfailure: Callable[[], Coroutine[Any, Any, None]] | None = None,
+):
     message = messaging.Message(
         notification=messaging.Notification(
             title=title,
@@ -39,5 +41,12 @@ def send_fcm_message(token, title, body, data=None):
         token=token,
     )
 
-    response = messaging.send(message)
-    return response
+    try:
+        response = messaging.send(message)
+        return response
+
+    except FCMUnregisteredError:
+        logger.warning(f"Unregistered FCM token: {token}")
+        if onfailure:
+            await onfailure()
+        return None

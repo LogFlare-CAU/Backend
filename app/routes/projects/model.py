@@ -22,6 +22,13 @@ class Project(Base):
         passive_deletes=True,
         lazy="selectin",
     )
+    users = relationship(
+        "ProjectPerms",
+        back_populates="project",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        lazy="selectin",
+    )
 
 
 class LogFile(Base):
@@ -60,3 +67,8 @@ class ProjectPerms(Base):
         comment="유저 ID",
     )
     view = Column(Boolean, nullable=False, default=0, comment="뷰 권한")
+    project = relationship(
+        "Project",
+        back_populates="users",
+        lazy="selectin",
+    )

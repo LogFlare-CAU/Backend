@@ -5,8 +5,9 @@ from fastapi import HTTPException
 from sqlalchemy import select, delete
 from sqlalchemy.orm import selectinload
 from . import schema, model
-import secrets
 from common.jwt_utils import generate_jwt
+
+from routes.user.service import get_user
 
 
 async def create_project(
@@ -40,7 +41,9 @@ async def get_project(
 ) -> model.Project:
     stmt = select(model.Project).where(model.Project.id == project_id)
     if load:
-        stmt = stmt.options(selectinload(model.Project.logfiles))
+        stmt = stmt.options(selectinload(model.Project.logfiles)).options(
+            selectinload(model.Project.users)
+        )
     result = await conn.execute(stmt)
     project = result.scalars().first()
     if not project:
@@ -109,8 +112,15 @@ async def get_logfile(
     return logfile
 
 
-async def list_projects(conn: AsyncSession) -> Sequence[model.Project]:
-    result = await conn.execute(select(model.Project))
+async def list_projects(
+    conn: AsyncSession, load: bool = False
+) -> Sequence[model.Project]:
+    stmt = select(model.Project)
+    if load:
+        stmt = stmt.options(selectinload(model.Project.logfiles)).options(
+            selectinload(model.Project.users)
+        )
+    result = await conn.execute(stmt)
     projects = result.scalars().all()
     return projects
 
@@ -142,4 +152,27 @@ async def grant_project_perms(
     conn.add(perms)
     await conn.commit()
     await conn.refresh(perms)
+    return perms
+
+
+async def reset_project_perms_batch(
+    conn: AsyncSession, item: schema.ProjectPermsBatchParams
+) -> Sequence[model.ProjectPerms]:
+    stmt = delete(model.ProjectPerms).where(
+        model.ProjectPerms.project_id == item.projectid
+    )
+    await conn.execute(stmt)
+    await conn.commit()
+    for username in item.usernames:
+        user = await get_user(conn, username)
+        perms = model.ProjectPerms(
+            user_id=user.idx, project_id=item.projectid, view=True
+        )
+        conn.add(perms)
+    await conn.commit()
+    stmt = select(model.ProjectPerms).where(
+        model.ProjectPerms.project_id == item.projectid
+    )
+    result = await conn.execute(stmt)
+    perms = result.scalars().all()
     return perms

@@ -51,6 +51,11 @@ class FCMConfig(BaseModel):
 # ==============================================================
 
 
+class FCMTestParams(BaseModel):
+    title: str = Field(..., description="알림 제목")
+    body: str = Field(..., description="알림 내용")
+
+
 class FCMTokenParams(BaseModel):
     fcm_token: str = Field(..., description="FCM 토큰")
 

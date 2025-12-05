@@ -32,7 +32,6 @@ async def _require_moderator(
 ) -> None:
     payload = await _require_login(credentials)
     perm = int(payload.get("perm", 0))
-    logger.info(f"User permission: {perm}")
     if perm < int(Permissions.MODERATOR):
         raise HTTPException(HTTP_403_FORBIDDEN, "Insufficient permission")
     return None
