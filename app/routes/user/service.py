@@ -1,4 +1,6 @@
 import time
+from typing import Sequence
+
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +18,13 @@ async def get_user(conn: AsyncSession, username: str) -> model.User:
     if not user:
         raise HTTPException(HTTP_404_NOT_FOUND)
     return user
+
+
+async def list_users(conn: AsyncSession) -> Sequence[model.User]:
+    stmt = select(model.User).order_by(model.User.idx)
+    result = await conn.execute(stmt)
+    users = result.scalars().all()
+    return users
 
 
 async def create_user(conn: AsyncSession, item: schema.UserCreateParams) -> model.User:
@@ -72,6 +81,7 @@ async def create_token(
     conn.add(token)
     await conn.commit()
     await conn.refresh(token)
+    await cleanup_tokens(conn, user.idx)
     return token
 
 
@@ -88,3 +98,18 @@ async def delete_expired_tokens(conn: AsyncSession) -> None:
     for token in expired_tokens:
         await conn.delete(token)
     await conn.commit()
+
+
+async def cleanup_tokens(conn: AsyncSession, user_idx: int) -> None:
+    """사용자별 토큰 3개까지만 유지하고 나머지는 삭제한다."""
+    stmt = (
+        select(model.Token)
+        .where(model.Token.user_idx == user_idx)
+        .order_by(model.Token.idx.desc())
+    )
+    result = await conn.execute(stmt)
+    tokens = result.scalars().all()
+    if len(tokens) > 3:
+        for token in tokens[3:]:
+            await conn.delete(token)
+        await conn.commit()
