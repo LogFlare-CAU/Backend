@@ -32,8 +32,8 @@ async def get_projects(conn: AsyncSession, userid: int) -> Sequence[model.Projec
     user = await user_service.get_user_byid(conn, userid)
     if user is None:
         raise HTTPException(HTTP_400_BAD_REQUEST, detail="user not found")
-    if user.permission == Permissions.ADMINISTRATOR:
-        return await service.list_projects(conn)
+    if user.permission >= Permissions.ADMINISTRATOR:
+        return await service.list_projects(conn, True)
     perms = await service.get_project_perms(conn, userid)
     project_ids = [perm.project_id for perm in perms]
     returnval = []
