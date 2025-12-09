@@ -25,6 +25,20 @@ async def list_users(request: Request, conn=get_db):
     return APIResponse(data=[dict(user) for user in res])
 
 
+@router.get("/name", response_model=schema.UserResponse, responses=r_make([401, 403]), dependencies=require_moderator)
+async def get_user_by_name(request: Request, username: str, conn=get_db):
+    """
+    사용자 이름으로 사용자의 정보를 반환합니다.<br>
+    로그인 토큰이 필요하며, 관리자 권한이 있어야 합니다.<br>
+    <br>
+    401: 인증 실패<br>
+    403: 권한 없음<br>
+    404: 사용자를 찾을 수 없음<br>
+    """
+    res = await service.get_user(conn, username)
+    return APIResponse(data=dict(res))
+
+
 @router.get(
     "/me",
     response_model=schema.UserResponse,
@@ -45,7 +59,7 @@ async def get_current_user(request: Request, conn=get_db):
 
 @router.post("/auth", response_model=StringResponse, responses=r_make([401, 404]))
 async def authenticate_user(
-    request: Request, auth_data: schema.UserAuthParams, conn=get_db
+        request: Request, auth_data: schema.UserAuthParams, conn=get_db
 ):
     """
     사용자를 인증합니다. 만일 인증에 성공하면 해당 사용자의 토큰을 반환합니다.<br>
@@ -65,7 +79,7 @@ async def authenticate_user(
     dependencies=require_moderator,
 )
 async def create_user(
-    request: Request, user_data: schema.UserCreateParams, conn=get_db
+        request: Request, user_data: schema.UserCreateParams, conn=get_db
 ):
     """
     새로운 사용자를 생성합니다.<br>
@@ -75,6 +89,48 @@ async def create_user(
     409: 이미 존재하는 사용자<br>
     """
     res = await service.create_user(conn, user_data)
+    return APIResponse(data=dict(res))
+
+
+@router.post("/{useridx}/reset_password", response_model=StringResponse, responses=r_make([403, 404]),
+             dependencies=require_moderator)
+async def reset_user_password(
+        request: Request,
+        useridx: int,
+        item: schema.ResetPasswordParams,
+        conn=get_db,
+):
+    """
+    사용자의 비밀번호를 초기화합니다. 초기화된 비밀번호는 "password"입니다.<br>
+    로그인 토큰이 필요하며, 관리자 권한이 있어야 합니다.<br>
+    <br>
+    403: 권한 없음<br>
+    404: 사용자를 찾을 수 없음<br>
+    """
+    await service.reset_user_password(conn, useridx, item.new_password)
+    return APIResponse(data="Password has been reset to 'password'.")
+
+
+@router.patch(
+    "/{useridx}",
+    response_model=schema.UserResponse,
+    responses=r_make([403, 404, 409]),
+    dependencies=require_moderator, )
+async def update_user(
+        request: Request,
+        useridx: int,
+        user_data: schema.UserUpdateParams,
+        conn=get_db,
+):
+    """
+    사용자의 정보를 수정합니다.<br>
+    로그인 토큰이 필요하며, 관리자 권한이 있어야 합니다.<br>
+    <br>
+    403: 권한 없음<br>
+    404: 사용자를 찾을 수 없음<br>
+    409: 이미 존재하는 사용자 이름<br>
+    """
+    res = await service.update_user(conn, useridx, user_data)
     return APIResponse(data=dict(res))
 
 

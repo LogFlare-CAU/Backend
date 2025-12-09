@@ -27,6 +27,39 @@ async def list_users(conn: AsyncSession) -> Sequence[model.User]:
     return users
 
 
+async def reset_user_password(conn: AsyncSession, useridx: int, new_password: str) -> model.User:
+    stmt = select(model.User).where(model.User.idx == useridx)
+    result = await conn.execute(stmt)
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(HTTP_404_NOT_FOUND)
+    user.password = hash_password(new_password)
+    user.updated_at = datetime.now(UTC)
+    conn.add(user)
+    await conn.commit()
+    await conn.refresh(user)
+    return user
+
+
+async def update_user(conn: AsyncSession, useridx: int, item: schema.UserUpdateParams) -> model.User:
+    stmt = select(model.User).where(model.User.idx == useridx)
+    result = await conn.execute(stmt)
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(HTTP_404_NOT_FOUND)
+    if item.password is not None:
+        user.password = hash_password(item.password)
+    if item.permission is not None:
+        user.permission = item.permission
+    if item.username is not None:
+        user.username = item.username
+    user.updated_at = datetime.now(UTC)
+    conn.add(user)
+    await conn.commit()
+    await conn.refresh(user)
+    return user
+
+
 async def create_user(conn: AsyncSession, item: schema.UserCreateParams) -> model.User:
     stmt = select(model.User).where(model.User.username == item.username)
     result = await conn.execute(stmt)
@@ -66,7 +99,7 @@ async def get_user_byid(conn: AsyncSession, useridx: int) -> model.User:
 
 
 async def create_token(
-    conn: AsyncSession, user_idx: int, keep_logged: bool = False
+        conn: AsyncSession, user_idx: int, keep_logged: bool = False
 ) -> model.Token:
     await delete_expired_tokens(conn)
     user = await get_user_byid(conn, user_idx)

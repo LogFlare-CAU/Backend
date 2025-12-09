@@ -54,7 +54,7 @@ class FCMConfig(BaseModel):
 class FCMTestParams(BaseModel):
     title: str = Field(..., description="알림 제목")
     body: str = Field(..., description="알림 내용")
-
+    data: dict[str, str] = Field(default_factory=dict, description="추가 데이터 페이로드 (옵션)")
 
 class FCMTokenParams(BaseModel):
     fcm_token: str = Field(..., description="FCM 토큰")
