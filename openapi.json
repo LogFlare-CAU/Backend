@@ -1884,7 +1884,7 @@
           "project": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO__3"
+                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO"
               },
               {
                 "type": "null"
@@ -2295,7 +2295,7 @@
           "data": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO"
+                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO__1"
               },
               {
                 "type": "null"
@@ -2380,7 +2380,7 @@
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO"
+                  "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO__1"
                 },
                 "type": "array"
               },
@@ -2899,7 +2899,7 @@
           "project": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO__3"
+                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO"
               },
               {
                 "type": "null"
@@ -3019,6 +3019,51 @@
             ],
             "title": "Description",
             "description": "프로젝트 설명, 이것도 사용할지는 모르겠습니다"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "ProjectDTO",
+        "description": "ProjectDTO"
+      },
+      "common__schema__sqlalchemy_orm_converter__ProjectDTO__1": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "ID"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "프로젝트 이름"
+          },
+          "alias": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alias",
+            "description": "프로젝트 별칭, 사용할지는 모르겠습니다"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "프로젝트 설명, 이것도 사용할지는 모르겠습니다"
           },
           "logfiles": {
             "items": {
@@ -3030,7 +3075,7 @@
           },
           "users": {
             "items": {
-              "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectPermsDTO__1"
+              "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectPermsDTO"
             },
             "type": "array",
             "title": "Users",
@@ -3103,56 +3148,11 @@
           },
           "users": {
             "items": {
-              "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectPermsDTO"
+              "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectPermsDTO__2"
             },
             "type": "array",
             "title": "Users",
             "description": "users 관계"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "name"
-        ],
-        "title": "ProjectDTO",
-        "description": "ProjectDTO"
-      },
-      "common__schema__sqlalchemy_orm_converter__ProjectDTO__3": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id",
-            "description": "ID"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name",
-            "description": "프로젝트 이름"
-          },
-          "alias": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Alias",
-            "description": "프로젝트 별칭, 사용할지는 모르겠습니다"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description",
-            "description": "프로젝트 설명, 이것도 사용할지는 모르겠습니다"
           }
         },
         "type": "object",
@@ -3196,7 +3196,7 @@
         "title": "ProjectPermsDTO",
         "description": "ProjectPermsDTO"
       },
-      "common__schema__sqlalchemy_orm_converter__ProjectPermsDTO__1": {
+      "common__schema__sqlalchemy_orm_converter__ProjectPermsDTO__2": {
         "properties": {
           "id": {
             "type": "integer",
@@ -3254,7 +3254,7 @@
           "project": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO__3"
+                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO"
               },
               {
                 "type": "null"
