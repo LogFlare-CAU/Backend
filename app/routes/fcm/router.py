@@ -66,7 +66,7 @@ async def test_fcm_notification(
     data = {"errorid": "1234", "type": "TestErrortype", "level": "ERROR",
             "timestamp": datetime.now().isoformat(),
             "message": "This is a test message sent manually from logflare server", "projectid": "0",
-            "test": "1"}
+            "test": "true"}
 
     fcm_tokens = await service.get_fcm_tokens(conn, userid)
     if not fcm_tokens:

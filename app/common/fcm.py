@@ -34,8 +34,8 @@ async def send_fcm_message(
 ):
     message = messaging.Message(
         notification=messaging.Notification(
-            title=title,
-            body=body,
+            # title=title,
+            # body=body,
         ),
         data=data or {},
         token=token,
