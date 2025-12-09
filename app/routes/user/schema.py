@@ -19,5 +19,15 @@ class UserCreateParams(BaseModel):
     permission: int = Field(Permissions.USER, description="사용자 권한")
 
 
+class ResetPasswordParams(BaseModel):
+    new_password: str = Field("password", min_length=8, description="새 비밀번호")
+
+
+class UserUpdateParams(BaseModel):
+    username: str | None = Field(None, min_length=3, max_length=32, description="사용자명")
+    permission: int | None = Field(None, description="사용자 권한")
+    password: str | None = Field(None, min_length=8, description="사용자 비밀번호")
+
+
 UserResponse = make_named_response(User, "UserResponse")
 UserSequenceResponse = make_named_response(Sequence[User], "UserSequenceResponse")
