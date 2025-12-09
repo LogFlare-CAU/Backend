@@ -118,6 +118,74 @@
         ]
       }
     },
+    "/user/name": {
+      "get": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Get User By Name",
+        "description": "사용자 이름으로 사용자의 정보를 반환합니다.<br>\n로그인 토큰이 필요하며, 관리자 권한이 있어야 합니다.<br>\n<br>\n401: 인증 실패<br>\n403: 권한 없음<br>\n404: 사용자를 찾을 수 없음<br>",
+        "operationId": "get_user_by_name_user_name_get",
+        "security": [
+          {
+            "Authorization": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/user/me": {
       "get": {
         "tags": [
@@ -217,7 +285,171 @@
         }
       }
     },
+    "/user/{useridx}/reset_password": {
+      "post": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Reset User Password",
+        "description": "사용자의 비밀번호를 초기화합니다. 초기화된 비밀번호는 \"password\"입니다.<br>\n로그인 토큰이 필요하며, 관리자 권한이 있어야 합니다.<br>\n<br>\n403: 권한 없음<br>\n404: 사용자를 찾을 수 없음<br>",
+        "operationId": "reset_user_password_user__useridx__reset_password_post",
+        "security": [
+          {
+            "Authorization": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "useridx",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Useridx"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordParams"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StringResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/user/{useridx}": {
+      "patch": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Update User",
+        "description": "사용자의 정보를 수정합니다.<br>\n로그인 토큰이 필요하며, 관리자 권한이 있어야 합니다.<br>\n<br>\n403: 권한 없음<br>\n404: 사용자를 찾을 수 없음<br>\n409: 이미 존재하는 사용자 이름<br>",
+        "operationId": "update_user_user__useridx__patch",
+        "security": [
+          {
+            "Authorization": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "useridx",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Useridx"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserUpdateParams"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "delete": {
         "tags": [
           "user"
@@ -417,6 +649,91 @@
       }
     },
     "/project/{projectid}": {
+      "patch": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "프로젝트 이름 수정",
+        "operationId": "update_project_project__projectid__patch",
+        "security": [
+          {
+            "Authorization": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Projectid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectCreateParams"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "delete": {
         "tags": [
           "projects"
@@ -742,6 +1059,83 @@
         ]
       }
     },
+    "/project/{projectid}/perm": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "프로젝트 권한 조회",
+        "operationId": "list_project_perms_project__projectid__perm_get",
+        "security": [
+          {
+            "Authorization": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Projectid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectPermsSequenceResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/project/perm/batch/reset": {
       "post": {
         "tags": [
@@ -887,6 +1281,16 @@
               "type": "integer",
               "default": 0,
               "title": "Offset"
+            }
+          },
+          {
+            "name": "sortby",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "newest",
+              "title": "Sortby"
             }
           }
         ],
@@ -1480,7 +1884,7 @@
           "project": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO"
+                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO__3"
               },
               {
                 "type": "null"
@@ -1536,6 +1940,14 @@
             "type": "string",
             "title": "Body",
             "description": "알림 내용"
+          },
+          "data": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Data",
+            "description": "추가 데이터 페이로드 (옵션)"
           }
         },
         "type": "object",
@@ -1696,7 +2108,7 @@
           "data": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__LogFileDTO__3"
+                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__LogFileDTO"
               },
               {
                 "type": "null"
@@ -1883,7 +2295,7 @@
           "data": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO__1"
+                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO"
               },
               {
                 "type": "null"
@@ -1968,7 +2380,7 @@
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO__1"
+                  "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO"
                 },
                 "type": "array"
               },
@@ -1983,6 +2395,19 @@
         "type": "object",
         "title": "ProjectSequenceResponse",
         "description": "ProjectSequenceResponse"
+      },
+      "ResetPasswordParams": {
+        "properties": {
+          "new_password": {
+            "type": "string",
+            "minLength": 8,
+            "title": "New Password",
+            "description": "새 비밀번호",
+            "default": "password"
+          }
+        },
+        "type": "object",
+        "title": "ResetPasswordParams"
       },
       "StringResponse": {
         "properties": {
@@ -2243,6 +2668,51 @@
         "title": "UserSequenceResponse",
         "description": "UserSequenceResponse"
       },
+      "UserUpdateParams": {
+        "properties": {
+          "username": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 32,
+                "minLength": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username",
+            "description": "사용자명"
+          },
+          "permission": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Permission",
+            "description": "사용자 권한"
+          },
+          "password": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 8
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password",
+            "description": "사용자 비밀번호"
+          }
+        },
+        "type": "object",
+        "title": "UserUpdateParams"
+      },
       "ValidationError": {
         "properties": {
           "loc": {
@@ -2425,6 +2895,50 @@
             "type": "string",
             "title": "File Name",
             "description": "로그 파일 이름 (보이는 용도)"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO__3"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "project 관계"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "project_id",
+          "file_path",
+          "file_name"
+        ],
+        "title": "LogFileDTO",
+        "description": "LogFileDTO"
+      },
+      "common__schema__sqlalchemy_orm_converter__LogFileDTO__1": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "ID"
+          },
+          "project_id": {
+            "type": "integer",
+            "title": "Project Id",
+            "description": "프로젝트 ID"
+          },
+          "file_path": {
+            "type": "string",
+            "title": "File Path",
+            "description": "로그 파일 경로 (서버 상 실제 경로, 파일명 포함)"
+          },
+          "file_name": {
+            "type": "string",
+            "title": "File Name",
+            "description": "로그 파일 이름 (보이는 용도)"
           }
         },
         "type": "object",
@@ -2458,50 +2972,6 @@
             "type": "string",
             "title": "File Name",
             "description": "로그 파일 이름 (보이는 용도)"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "project_id",
-          "file_path",
-          "file_name"
-        ],
-        "title": "LogFileDTO",
-        "description": "LogFileDTO"
-      },
-      "common__schema__sqlalchemy_orm_converter__LogFileDTO__3": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id",
-            "description": "ID"
-          },
-          "project_id": {
-            "type": "integer",
-            "title": "Project Id",
-            "description": "프로젝트 ID"
-          },
-          "file_path": {
-            "type": "string",
-            "title": "File Path",
-            "description": "로그 파일 경로 (서버 상 실제 경로, 파일명 포함)"
-          },
-          "file_name": {
-            "type": "string",
-            "title": "File Name",
-            "description": "로그 파일 이름 (보이는 용도)"
-          },
-          "project": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "project 관계"
           }
         },
         "type": "object",
@@ -2549,55 +3019,10 @@
             ],
             "title": "Description",
             "description": "프로젝트 설명, 이것도 사용할지는 모르겠습니다"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "name"
-        ],
-        "title": "ProjectDTO",
-        "description": "ProjectDTO"
-      },
-      "common__schema__sqlalchemy_orm_converter__ProjectDTO__1": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id",
-            "description": "ID"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name",
-            "description": "프로젝트 이름"
-          },
-          "alias": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Alias",
-            "description": "프로젝트 별칭, 사용할지는 모르겠습니다"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description",
-            "description": "프로젝트 설명, 이것도 사용할지는 모르겠습니다"
           },
           "logfiles": {
             "items": {
-              "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__LogFileDTO"
+              "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__LogFileDTO__1"
             },
             "type": "array",
             "title": "Logfiles",
@@ -2605,7 +3030,7 @@
           },
           "users": {
             "items": {
-              "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectPermsDTO"
+              "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectPermsDTO__1"
             },
             "type": "array",
             "title": "Users",
@@ -2678,11 +3103,56 @@
           },
           "users": {
             "items": {
-              "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectPermsDTO__2"
+              "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectPermsDTO"
             },
             "type": "array",
             "title": "Users",
             "description": "users 관계"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "ProjectDTO",
+        "description": "ProjectDTO"
+      },
+      "common__schema__sqlalchemy_orm_converter__ProjectDTO__3": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "ID"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "프로젝트 이름"
+          },
+          "alias": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alias",
+            "description": "프로젝트 별칭, 사용할지는 모르겠습니다"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "프로젝트 설명, 이것도 사용할지는 모르겠습니다"
           }
         },
         "type": "object",
@@ -2726,7 +3196,7 @@
         "title": "ProjectPermsDTO",
         "description": "ProjectPermsDTO"
       },
-      "common__schema__sqlalchemy_orm_converter__ProjectPermsDTO__2": {
+      "common__schema__sqlalchemy_orm_converter__ProjectPermsDTO__1": {
         "properties": {
           "id": {
             "type": "integer",
@@ -2784,7 +3254,7 @@
           "project": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO"
+                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO__3"
               },
               {
                 "type": "null"
