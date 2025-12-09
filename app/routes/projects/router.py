@@ -31,13 +31,26 @@ async def list_projects(request: Request, conn=get_db):
     response_model=schema.ProjectResponseWithToken,
 )
 async def create_project(
-    request: Request, items: schema.ProjectCreateParams, conn=get_db
+        request: Request, items: schema.ProjectCreateParams, conn=get_db
 ) -> APIResponse:
     """
     새로운  프로젝트를 생성합니다. 프로젝트 생성에 성공하면 프로젝트 토큰을 반환합니다.
     """
     project = await service.create_project(conn, items)
     return APIResponse(data=project)
+
+
+@router.patch(
+    "/{projectid}",
+    summary="프로젝트 이름 수정",
+    dependencies=require_moderator,
+    responses=rm([401, 403, 404]),
+    response_model=schema.ProjectResponse, )
+async def update_project(
+        request: Request, projectid: int, item: schema.ProjectCreateParams, conn=get_db
+) -> APIResponse:
+    res = await service.update_project(conn, projectid, item)
+    return APIResponse(data=dict(res))
 
 
 @router.delete(
@@ -60,7 +73,7 @@ async def delete_project(request: Request, projectid: int, conn=get_db) -> APIRe
     response_model=schema.LogFileResponse,
 )
 async def add_logfile(
-    request: Request, projectid: int, item: schema.LogFileCreateParams, conn=get_db
+        request: Request, projectid: int, item: schema.LogFileCreateParams, conn=get_db
 ):
     res = await application.add_logfile(conn, projectid, item)
     return APIResponse(data=dict(res))
@@ -86,10 +99,23 @@ async def delete_logfile(request: Request, projectid: int, logfileid: int, conn=
     response_model=schema.ProjectPermsResponse,
 )
 async def grant_project_perms(
-    request: Request, item: schema.ProjectPermsParams, conn=get_db
+        request: Request, item: schema.ProjectPermsParams, conn=get_db
 ):
     res = await service.grant_project_perms(conn, item)
     return APIResponse(data=dict(res))
+
+
+@router.get(
+    "/{projectid}/perm",
+    summary="프로젝트 권한 조회",
+    dependencies=require_moderator,
+    responses=rm([401, 403, 404]),
+    response_model=schema.ProjectPermsSequenceResponse, )
+async def list_project_perms(
+        request: Request, projectid: int, conn=get_db
+):
+    res = await service.list_project_perms(conn, projectid)
+    return APIResponse(data=[dict(perm) for perm in res])
 
 
 @router.post(
@@ -100,7 +126,7 @@ async def grant_project_perms(
     response_model=schema.ProjectPermsSequenceResponse,
 )
 async def reset_project_perms_batch(
-    request: Request, item: schema.ProjectPermsBatchParams, conn=get_db
+        request: Request, item: schema.ProjectPermsBatchParams, conn=get_db
 ):
     """
     프로젝트에 대한 권한을  일괄 재설정합니다.<br>

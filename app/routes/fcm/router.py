@@ -9,6 +9,7 @@ from routes.user.authenticate import require_moderator, require_login, get_useri
 from . import model, schema, service
 from .schema import FCMConfig
 from common.fcm import send_fcm_message, FCMUnregisteredError
+from datetime import datetime
 
 router = APIRouter(prefix="/fcm", tags=["fcm"])
 
@@ -20,7 +21,7 @@ router = APIRouter(prefix="/fcm", tags=["fcm"])
     dependencies=require_login,
 )
 async def get_fcm_data(
-    request: Request,
+        request: Request,
 ):
     """
     앱에서 필요한 FCM 데이터를 리턴합니다.<br>
@@ -37,9 +38,9 @@ async def get_fcm_data(
     dependencies=require_login,
 )
 async def register_fcm_token(
-    request: Request,
-    fcm_data: schema.FCMTokenParams,
-    conn=get_db,
+        request: Request,
+        fcm_data: schema.FCMTokenParams,
+        conn=get_db,
 ):
     """
     FCM 토큰을 등록합니다.<br>
@@ -52,9 +53,9 @@ async def register_fcm_token(
 
 @router.post("/test", dependencies=require_moderator)
 async def test_fcm_notification(
-    request: Request,
-    fcm_data: schema.FCMTestParams,
-    conn=get_db,
+        request: Request,
+        fcm_data: schema.FCMTestParams,
+        conn=get_db,
 ):
     """
     FCM 알림 테스트용 엔드포인트입니다.<br>
@@ -62,6 +63,11 @@ async def test_fcm_notification(
     관리자 권한이 필요합니다.
     """
     userid = get_userid(request)
+    data = {"errorid": "1234", "type": "TestErrortype", "level": "ERROR",
+            "timestamp": datetime.now().isoformat(),
+            "message": "This is a test message sent manually from logflare server", "projectid": "0",
+            "test": "1"}
+
     fcm_tokens = await service.get_fcm_tokens(conn, userid)
     if not fcm_tokens:
         raise HTTPException(
@@ -73,6 +79,7 @@ async def test_fcm_notification(
             token.fcm_token,
             fcm_data.title,
             fcm_data.body,
+            data,
             onfailure=partial(service.remove_fcm_token, conn, token.fcm_token),
         )
     return APIResponse(data={"sent_to": len(fcm_tokens)})
