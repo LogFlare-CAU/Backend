@@ -15,7 +15,7 @@ async def notify_error(conn: AsyncSession, error: model.Errorlog, projectid: int
     super_user_fcm = await fcm_service.get_fcm_tokens(conn, 1)
     title = f"Error in project {project.name}"
     msg = f"Error ID: {error.id}\nMessage: {error.message}\nTime: {error.timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
-    data = {"errorid": str(error.id), "type": error.errortype or "Unknown", "level": error.level, "timestamp": error.timestamp.isoformat(), "message": error.message, "projectid": str(projectid), "test": "1" if test else "0"}
+    data = {"errorid": str(error.id), "type": error.errortype or "Unknown", "level": error.level, "timestamp": error.timestamp.isoformat(), "message": error.message, "projectid": str(projectid), "test": "true" if test else "false"}
 
     for fcm in super_user_fcm:  # 슈퍼 유저는 무조건 알림
         await send_fcm_message(
