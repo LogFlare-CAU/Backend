@@ -27,16 +27,17 @@ async def health_check():
     response_model=StringSequenceResponse,
 )
 async def read_log(
-    request: Request,
-    project_id: int,
-    logfileid: int,
-    limit: int = 50,
-    offset: int = 0,
-    conn=get_db,
+        request: Request,
+        project_id: int,
+        logfileid: int,
+        limit: int = 50,
+        offset: int = 0,
+        sortby: str = "newest",
+        conn=get_db,
 ):
     """ """
     userid = get_userid(request)
-    res = await application.read_log(conn, project_id, userid, logfileid, limit, offset)
+    res = await application.read_log(conn, project_id, userid, logfileid, limit, offset, sortby)
     return StringSequenceResponse(data=res)
 
 
@@ -48,10 +49,10 @@ async def read_log(
     responses=rm([401, 403, 404]),
 )
 async def log_error(
-    request: Request,
-    log: schema.ErrorParams,
-    bg_tasks: BackgroundTasks,
-    conn=get_db,
+        request: Request,
+        log: schema.ErrorParams,
+        bg_tasks: BackgroundTasks,
+        conn=get_db,
 ):
     """
     타 코드에서 발생한 에러 로그를 수신하는 엔드포인트<br>
@@ -75,12 +76,12 @@ async def log_error(
     responses=rm([401, 403, 404]),
 )
 async def get_errors(
-    request: Request,
-    project_id: int = None,
-    limit: int = 50,
-    offset: int = 0,
-    sortby: str = "newest",
-    conn=get_db,
+        request: Request,
+        project_id: int = None,
+        limit: int = 50,
+        offset: int = 0,
+        sortby: str = "newest",
+        conn=get_db,
 ):
     """
     에러 로그를 조회하는 엔드포인트<br>
