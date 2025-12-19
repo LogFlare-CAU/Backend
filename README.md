@@ -13,6 +13,13 @@ FastAPI 기반의 백엔드 서버로, 공통 스키마 구조와 응답 형식�
 
 ---
 
+## ✅ 요구 사항
+
+* Python 3.12
+* SQLite (기본값, `init_db.py` 사용 시 자동 생성)
+
+---
+
 ## ⚙️ 실행 방법
 
 ### 1. 개발 환경 설정
@@ -20,32 +27,48 @@ FastAPI 기반의 백엔드 서버로, 공통 스키마 구조와 응답 형식�
 Python 3.12 환경에서 개발 중입니다.
 
 ```bash
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. DB 생성
+### 2. 환경 변수 설정
+
+필요한 환경 변수 템플릿은 `logflare.env.copy`에 있습니다.
+
+```bash
+cp logflare.env.copy .env
+```
+
+필요에 따라 `.env` 값을 수정하세요. (예: FCM 키 파일 경로)
+
+### 3. DB 생성
 
 동봉된 `init_db.py` 스크립트를 사용하여 초기 데이터베이스를 생성합니다.
 
 ```bash
-python init_db.py
+python app/init_db.py
 ```
 
 해당 파일을 실행하면 언제든지 초기 DB 상태로 복원할 수 있습니다.
 
-### 3. 실행
+### 4. 실행
 
-추후 `.env` 파일 추가 및 환경 변수 설명이 작성될 예정입니다.
+```bash
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+서버가 시작되면 기본 엔드포인트는 `http://localhost:8000` 입니다.
 
 ---
 
 ## 🧩 디렉토리 구조 및 역할
 
-### `COMMON`
+### `app/common`
 
 백엔드 전역에서 공통으로 사용하는 상수, 함수, 예외, 스키마 등을 포함합니다.
 
-### `ROUTES`
+### `app/routes`
 
 프로젝트의 핵심 기능이 구현된 디렉토리로, 각 API의 세부 로직을 담당합니다.
 
@@ -117,6 +140,29 @@ async def get_users(request: Request):
 
 * Swagger UI는 `/docs` 엔드포인트에서 자동 생성됩니다.
 * 모든 API는 `common.schema.APIResponse`를 상속하거나 `response_maker`를 통해 일관된 응답을 보장합니다.
+* 기본 포트는 `LOGFLARE_API_PORT` 환경 변수로 변경할 수 있습니다.
+
+---
+
+## 🛠️ 간단 CLI (프로젝트/로그파일 관리)
+
+DB에 직접 프로젝트를 생성하거나 로그 파일을 추가할 수 있는 **interactive CLI**를 제공합니다.
+
+```bash
+python projectmanager.py
+```
+
+```bash
+1) List projects
+2) Create project
+3) Delete project
+4) Rename project
+5) List logfiles in project
+6) Add logfile to project
+7) Delete logfile from project
+8) Update logfile in project
+0) Exit
+```
 
 ## 🌐 Swagger 문서
 [이곳에서 확인 가능합니다.](https://macqueen0987.github.io/swagger-viewer/?spec=https://raw.githubusercontent.com/LogFlare-CAU/Backend/openapi-jsons/openapi.json)
