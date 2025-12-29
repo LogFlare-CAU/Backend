@@ -5,3 +5,4 @@ Dockerfile
 *.env
 __pycache__
 google-services.json
+logflare_env
