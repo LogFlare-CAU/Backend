@@ -8,7 +8,7 @@ from fastapi import (
     HTTPException as FastAPIHTTPException,
 )
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from sqlalchemy.exc import IntegrityError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from common.env_utils import getenvval
@@ -24,6 +24,8 @@ description = "LogFlare API 서버"
 setup_uvicorn_file_logging()
 logger = get_logger()
 fcm_init()
+with open("./res/index.html", "r", encoding="utf-8") as f:
+    index_html_content = f.read()
 # ===========================INCLUE ROUTERS HERE===========================
 from routes import user, projects, logs, fcm
 
@@ -36,8 +38,8 @@ async def lifespan(app: FastAPI):
     yield
     # 앱 종료 시 정리 작업
 
-
-app = FastAPI(title=title, version=version, description=description, lifespan=lifespan)
+root_path = getenvval("LOGFLARE_API_ROOT_PATH", "")
+app = FastAPI(title=title, version=version, description=description, lifespan=lifespan, root_path=root_path, docs_url=None, redoc_url=None, openapi_url=None)
 app.include_router(user.router)
 app.include_router(projects.router)
 app.include_router(logs.router)
@@ -47,8 +49,7 @@ app.include_router(fcm.router)
 
 @app.get("/")
 def read_root(request: Request):
-    host = request.client.host
-    return {"Hello": "World", "host": host}
+    return HTMLResponse(content=index_html_content, status_code=200)
 
 
 # ===============================ERROR HANDLING==============================

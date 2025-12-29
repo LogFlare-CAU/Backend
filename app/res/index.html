@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LOGFLARE - Mobile Log Notification</title>
+    <style>
+        /* ===========================
+           Global Styles (Dark Theme)
+           =========================== */
+        body {
+            margin: 0;
+            font-family: "Segoe UI", "Apple SD Gothic Neo", sans-serif;
+            background-color: #1e1e2f; /* Dark Navy Background */
+            color: #e0e0e0;            /* Light Gray Text */
+            text-align: center;
+            padding: 40px 20px;
+            line-height: 1.6;
+        }
+
+        a {
+            text-decoration: none;
+            color: inherit;
+        }
+
+        /* ===========================
+           Header Section
+           =========================== */
+        .header-container {
+            margin-bottom: 50px;
+        }
+        h1 {
+            font-size: 3.5em;
+            margin: 0.1em 0;
+            color: #4ea1ff; /* Point Blue */
+            letter-spacing: -1px;
+        }
+        .subtitle {
+            font-size: 1.2em;
+            color: #bbbbbb;
+            font-weight: 300;
+            margin-bottom: 20px;
+        }
+        .description {
+            max-width: 600px;
+            margin: 0 auto;
+            color: #ccc;
+        }
+
+        /* ===========================
+           Section Container
+           =========================== */
+        .section {
+            max-width: 800px;
+            margin: 30px auto;
+            text-align: left;
+            background: #2a2a3d; /* Card Background */
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            border-left: 5px solid #4ea1ff; /* Left Accent Line */
+        }
+
+        .section h3 {
+            margin-top: 0;
+            margin-bottom: 20px;
+            color: #fff;
+            font-size: 1.4em;
+            border-bottom: 1px solid #444;
+            padding-bottom: 10px;
+        }
+
+        /* ===========================
+           Repo Links (Ecosystem)
+           =========================== */
+        .repo-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .repo-card {
+            background: #1e1e2f;
+            padding: 15px 20px;
+            border-radius: 8px;
+            border: 1px solid #444;
+            transition: all 0.2s ease;
+            display: block; /* For <a> tag */
+        }
+        .repo-card:hover {
+            border-color: #4ea1ff;
+            transform: translateX(5px);
+            background: #252538;
+        }
+        .repo-title {
+            font-weight: bold;
+            color: #4ea1ff;
+            font-size: 1.1em;
+            margin-right: 8px;
+        }
+        .repo-desc {
+            font-size: 0.9em;
+            color: #bbb;
+        }
+
+        /* ===========================
+           Tech Stack Badges
+           =========================== */
+        .badge-group {
+            margin-bottom: 20px;
+        }
+        .badge-group h4 {
+            margin: 5px 0 10px 0;
+            font-size: 1em;
+            color: #888;
+            font-weight: normal;
+        }
+        .badges img {
+            margin: 4px;
+            height: 28px; /* Badge height alignment */
+        }
+
+        /* ===========================
+           Lists (Motivation/Functions)
+           =========================== */
+        ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        ul li {
+            margin-bottom: 10px;
+            position: relative;
+            padding-left: 20px;
+        }
+        ul li::before {
+            content: "•";
+            color: #4ea1ff;
+            font-weight: bold;
+            position: absolute;
+            left: 0;
+        }
+        .bold-text {
+            color: #fff;
+            font-weight: bold;
+        }
+
+        /* ===========================
+           Team Table
+           =========================== */
+        .team-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 0.95em;
+        }
+        .team-table th, .team-table td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #444;
+        }
+        .team-table th {
+            color: #4ea1ff;
+            font-weight: 600;
+            border-bottom: 2px solid #4ea1ff;
+        }
+        .team-table td:first-child {
+            font-weight: bold;
+            color: #fff;
+            white-space: nowrap;
+        }
+        /* Mobile Responsive for Table */
+        @media (max-width: 600px) {
+            .team-table thead { display: none; }
+            .team-table tr { display: block; margin-bottom: 20px; border: 1px solid #444; padding: 10px; border-radius: 8px; }
+            .team-table td { display: block; border: none; padding: 5px 0; }
+            .team-table td:first-child { color: #4ea1ff; font-size: 1.1em; margin-bottom: 5px; }
+        }
+
+        /* ===========================
+           CTA Button (New!)
+           =========================== */
+        .cta-button {
+            display: inline-block;
+            background-color: #4ea1ff;
+            color: #1e1e2f;
+            padding: 12px 30px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 1.1em;
+            margin-top: 15px;
+            transition: background-color 0.2s, transform 0.2s;
+        }
+        .cta-button:hover {
+            background-color: #3b8ce0;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(78, 161, 255, 0.4);
+        }
+
+        /* Footer */
+        .footer {
+            margin-top: 60px;
+            font-size: 0.9em;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header-container">
+    <h1>🚀 LOGFLARE</h1>
+    <div class="subtitle">Your Installation was Successful!</div>
+    <p class="description">
+        개발자들이 복잡한 서버 설정 없이 실시간으로 에러 로그를 관리하고<br>
+        모바일로 즉각적인 알림을 받을 수 있도록 돕는 솔루션입니다.
+    </p>
+</div>
+
+<div class="section">
+    <h3>📦 Ecosystem & Repositories</h3>
+    <div class="repo-list">
+        <a href="https://github.com/LogFlare-CAU/android" target="_blank" class="repo-card">
+            <span class="repo-title">📱 Android App</span>
+            <span class="repo-desc">로그 확인 및 실시간 푸시 알림 수신을 위한 Kotlin 기반 앱</span>
+        </a>
+        <a href="https://github.com/LogFlare-CAU/Backend" target="_blank" class="repo-card">
+            <span class="repo-title">💻 Backend Server</span>
+            <span class="repo-desc">로그 수집, 저장 및 FCM 알림 트리거를 담당하는 FastAPI 서버</span>
+        </a>
+        <a href="https://github.com/LogFlare-CAU/Python-Logger" target="_blank" class="repo-card">
+            <span class="repo-title">🐍 Python Logger</span>
+            <span class="repo-desc">기존 파이썬 프로젝트에 한 줄로 추가 가능한 커스텀 로거 라이브러리</span>
+        </a>
+    </div>
+</div>
+
+<div class="section">
+    <h3>🛠 Tech Stack</h3>
+
+    <div class="badge-group">
+        <h4>Frontend</h4>
+        <div class="badges">
+            <img src="https://img.shields.io/badge/kotlin-%237F52FF.svg?style=for-the-badge&logo=kotlin&logoColor=white" alt="Kotlin">
+            <img src="https://img.shields.io/badge/android%20studio-3DDC84?style=for-the-badge&logo=android-studio&logoColor=white" alt="Android Studio">
+            <img src="https://img.shields.io/badge/Jetpack%20Compose-4285F4?style=for-the-badge&logo=jetpack-compose&logoColor=white" alt="Jetpack Compose">
+        </div>
+    </div>
+
+    <div class="badge-group">
+        <h4>Backend</h4>
+        <div class="badges">
+            <img src="https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi" alt="FastAPI">
+            <img src="https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54" alt="Python">
+            <img src="https://img.shields.io/badge/SQLAlchemy-D71F00?style=for-the-badge&logo=sqlalchemy&logoColor=white" alt="SQLAlchemy">
+            <img src="https://img.shields.io/badge/sqlite-%2307405e.svg?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite">
+        </div>
+    </div>
+
+    <div class="badge-group">
+        <h4>Infrastructure & Tools</h4>
+        <div class="badges">
+            <img src="https://img.shields.io/badge/Firebase-039BE5?style=for-the-badge&logo=Firebase&logoColor=white" alt="Firebase">
+            <img src="https://img.shields.io/badge/figma-%23F24E1E.svg?style=for-the-badge&logo=figma&logoColor=white" alt="Figma">
+            <img src="https://img.shields.io/badge/github-%23121011.svg?style=for-the-badge&logo=github&logoColor=white" alt="GitHub">
+            <img src="https://img.shields.io/badge/Notion-%23000000.svg?style=for-the-badge&logo=notion&logoColor=white" alt="Notion">
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <h3>📌 Project Overview</h3>
+    <div style="margin-bottom: 25px;">
+        <h4 style="color:#bbb; margin:0 0 10px 0;">Project Motivation</h4>
+        <ul>
+            <li><span class="bold-text">복잡한 서버 설정:</span> 개인 개발자나 소규모 팀에게는 로그 관리 서버 구축이 큰 진입 장벽입니다.</li>
+            <li><span class="bold-text">웹 기반의 한계:</span> 기존 도구는 주로 웹 기반이라 모바일에서의 즉각적인 대응이 어렵습니다.</li>
+            <li><span class="bold-text">접근성 문제:</span> 서버 설정 없이도 즉시 로그 알림을 확인할 수 있는 환경을 지향합니다.</li>
+        </ul>
+    </div>
+
+    <div>
+        <h4 style="color:#bbb; margin:0 0 10px 0;">✨ Key Functions</h4>
+        <ul>
+            <li><span class="bold-text">실시간 로그 수집:</span> 개발 환경의 로그를 즉시 수집</li>
+            <li><span class="bold-text">스마트 알림:</span> 에러 발생 시 설정한 로그 레벨에 따라 푸시 알림 발송</li>
+            <li><span class="bold-text">필터링 & 관리:</span> 프로젝트별 무시 키워드 및 로그 레벨 상세 설정 가능</li>
+        </ul>
+    </div>
+</div>
+
+<div class="section">
+    <h3>🏗 System Architecture</h3>
+    <ol style="color:#ccc; padding-left: 20px; line-height: 1.8;">
+        <li><strong>Developer Local Environment:</strong> 커스텀 로거를 통해 로그를 전송</li>
+        <li><strong>LogFlare Server:</strong> 수신된 로그 저장 및 Firebase 알림 트리거</li>
+        <li><strong>Firebase (FCM):</strong> 안드로이드 앱으로 알림 전달</li>
+        <li><strong>Android App:</strong> 로그를 수신하여 UI에 표시하고 분석 제공</li>
+    </ol>
+</div>
+
+
+<div class="section" style="text-align: center;">
+    <h3>🔗 Learn More</h3>
+    <p style="margin-bottom: 20px;">
+        LogFlare 프로젝트의 전체 소스 코드와 상세 문서는<br>
+        GitHub Organization에서 확인하실 수 있습니다.
+    </p>
+    <a href="https://github.com/LogFlare-CAU" target="_blank" class="cta-button">
+        Visit GitHub Organization
+    </a>
+</div>
+
+<div class="footer">
+    © 2024 LogFlare-CAU Team. All rights reserved.
+</div>
+
+</body>
+</html>
