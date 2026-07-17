@@ -1,13 +1,15 @@
 import time
+from datetime import UTC, datetime
 from typing import Sequence
 
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.status import HTTP_409_CONFLICT, HTTP_404_NOT_FOUND
+from starlette.status import HTTP_404_NOT_FOUND, HTTP_409_CONFLICT
+
 from common.jwt_utils import generate_jwt
 from common.security import hash_password
-from datetime import datetime, UTC
+
 from . import model, schema
 
 
@@ -98,24 +100,42 @@ async def get_user_byid(conn: AsyncSession, useridx: int) -> model.User:
     return user
 
 
+# Session tokens: 15 minutes; keep-logged: 30 days (always finite / revocable).
+SESSION_TTL_SECONDS = 900
+KEEP_LOGGED_TTL_SECONDS = 30 * 24 * 60 * 60
+
+
 async def create_token(
         conn: AsyncSession, user_idx: int, keep_logged: bool = False
 ) -> model.Token:
     await delete_expired_tokens(conn)
     user = await get_user_byid(conn, user_idx)
     token = model.Token(user_idx=user.idx)
-    json = {"idx": user.idx, "perm": user.permission}
-    if keep_logged:
-        json["expire_at"] = -1
-    else:
-        json["expire_at"] = int(time.time()) + 900  # 15 minutes
-    token.token = generate_jwt(json)
-    token.exp = json["expire_at"]
+    ttl = KEEP_LOGGED_TTL_SECONDS if keep_logged else SESSION_TTL_SECONDS
+    claims = {"idx": user.idx, "perm": user.permission}
+    token.token = generate_jwt(claims, expire_seconds=ttl)
+    token.exp = int(time.time()) + ttl
     conn.add(token)
     await conn.commit()
     await conn.refresh(token)
     await cleanup_tokens(conn, user.idx)
     return token
+
+
+async def get_token_by_value(conn: AsyncSession, token_value: str) -> model.Token | None:
+    stmt = (
+        select(model.Token)
+        .where(model.Token.token == token_value)
+        .order_by(model.Token.idx.desc())
+        .limit(1)
+    )
+    result = await conn.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def delete_token(conn: AsyncSession, token: model.Token) -> None:
+    await conn.delete(token)
+    await conn.commit()
 
 
 async def delete_expired_tokens(conn: AsyncSession) -> None:
@@ -124,7 +144,6 @@ async def delete_expired_tokens(conn: AsyncSession) -> None:
         select(model.Token)
         .where(model.Token.exp.isnot(None))
         .where(model.Token.exp < now)
-        .where(model.Token.exp >= 0)
     )
     result = await conn.execute(stmt)
     expired_tokens = result.scalars().all()

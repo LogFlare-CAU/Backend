@@ -1,13 +1,19 @@
+import secrets
 from typing import Sequence
 
-from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException
-from sqlalchemy import select, delete
+from sqlalchemy import delete, select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from . import schema, model
-from common.jwt_utils import generate_jwt
 
 from routes.user.service import get_user
+
+from . import model, schema
+
+
+def generate_project_token() -> str:
+    """Opaque API key (not a JWT) — verified by DB equality only."""
+    return secrets.token_urlsafe(48)
 
 
 async def create_project(
@@ -17,9 +23,17 @@ async def create_project(
     conn.add(project)
     await conn.commit()
     await conn.refresh(project)
-    json = {"name": project.name, "id": project.id}
-    token = generate_jwt(json)
-    project.token = token
+    project.token = generate_project_token()
+    await conn.commit()
+    await conn.refresh(project)
+    return project
+
+
+async def rotate_project_token(
+        conn: AsyncSession, project_id: int
+) -> model.Project:
+    project = await get_project(conn, project_id)
+    project.token = generate_project_token()
     await conn.commit()
     await conn.refresh(project)
     return project

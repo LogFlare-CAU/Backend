@@ -1,4 +1,6 @@
 import time
+import uuid
+
 import jwt
 
 from .env_utils import getenvval
@@ -6,16 +8,24 @@ from .env_utils import getenvval
 algorithm = "HS256"
 secret = getenvval("JWT_SECRET")
 
-def generate_jwt(payload: dict):
-    """
-    Generate a JSON Web Token (JWT) from the given payload.
 
-    :param payload: Dictionary containing the payload data.
-    :return: Encoded JWT as a string.
+def generate_jwt(payload: dict, expire_seconds: int) -> str:
     """
-    payload['iat'] = int(time.time())
-    token = jwt.encode(payload, secret, algorithm=algorithm)
-    return token
+    Generate a JWT with a standard ``exp`` claim (required).
 
-def decode_jwt(payload:str):
-    return jwt.decode(payload, secret, algorithms=[algorithm])
+    :param payload: Claims (must not rely on custom expire_at).
+    :param expire_seconds: Lifetime from now in seconds; must be positive.
+    """
+    if expire_seconds <= 0:
+        raise ValueError("expire_seconds must be positive")
+    now = int(time.time())
+    claims = dict(payload)
+    claims["iat"] = now
+    claims["exp"] = now + expire_seconds
+    claims["jti"] = str(uuid.uuid4())
+    return jwt.encode(claims, secret, algorithm=algorithm)
+
+
+def decode_jwt(token: str) -> dict:
+    """Decode and verify signature + standard ``exp`` (rejects expired tokens)."""
+    return jwt.decode(token, secret, algorithms=[algorithm])

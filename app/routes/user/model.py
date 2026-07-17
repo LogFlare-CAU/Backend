@@ -1,5 +1,6 @@
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
+
 from common.basemodel import Base
-from sqlalchemy import Column, Integer, String, ForeignKey, Text, DateTime
 
 
 class User(Base):
@@ -15,6 +16,7 @@ class User(Base):
         default=0,
         comment="사용자 권한, 아직 어떻게 쓸지 몰라서 0으로 초기화",
     )
+    updated_at = Column(DateTime, nullable=True, comment="마지막 수정 시각")
 
 
 class Token(Base):

@@ -1,22 +1,23 @@
-import json
+from datetime import datetime
 from functools import partial
 
-from fastapi import APIRouter, Request, Depends, HTTPException, status
-from common.schema import response_maker as r_make, APIResponse
+from fastapi import APIRouter, HTTPException, Request, status
+
+from common.fcm import send_fcm_message
+from common.schema import APIResponse
+from common.schema import response_maker as r_make
 from common.sqlsession import get_db
-from common.env_utils import getenvval
-from routes.user.authenticate import require_moderator, require_login, get_userid
-from . import model, schema, service
-from .schema import FCMConfig
-from common.fcm import send_fcm_message, FCMUnregisteredError
-from datetime import datetime
+from routes.user.authenticate import get_userid, require_login, require_moderator
+
+from . import schema, service
+from .init import get_client_fcm_config
 
 router = APIRouter(prefix="/fcm", tags=["fcm"])
 
 
 @router.get(
     "/data",
-    response_model=APIResponse[FCMConfig],
+    response_model=APIResponse[schema.FCMClientConfig],
     responses=r_make([401]),
     dependencies=require_login,
 )
@@ -24,11 +25,9 @@ async def get_fcm_data(
         request: Request,
 ):
     """
-    앱에서 필요한 FCM 데이터를 리턴합니다.<br>
-    FCM 관련 데이터를 가져옵니다.
+    앱에서 필요한 최소 FCM 클라이언트 설정을 반환합니다.
     """
-    val = getenvval("FCM_GOOGLE_FILE")
-    return APIResponse(data=json.loads(val))
+    return APIResponse(data=schema.FCMClientConfig(**get_client_fcm_config()))
 
 
 @router.post(
@@ -63,10 +62,15 @@ async def test_fcm_notification(
     관리자 권한이 필요합니다.
     """
     userid = get_userid(request)
-    data = {"errorid": "1234", "type": "TestErrortype", "level": "ERROR",
-            "timestamp": datetime.now().isoformat(),
-            "message": "This is a test message sent manually from logflare server", "projectid": "0",
-            "test": "true"}
+    data = {
+        "errorid": "1234",
+        "type": "TestErrortype",
+        "level": "ERROR",
+        "timestamp": datetime.now().isoformat(),
+        "message": "This is a test message sent manually from logflare server",
+        "projectid": "0",
+        "test": "true",
+    }
 
     fcm_tokens = await service.get_fcm_tokens(conn, userid)
     if not fcm_tokens:

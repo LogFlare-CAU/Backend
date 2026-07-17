@@ -1,9 +1,9 @@
-from datetime import datetime, UTC
+from datetime import UTC, datetime
+
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, Text
+from sqlalchemy.orm import relationship
 
 from common.basemodel import Base
-from sqlalchemy import Integer, Text, DateTime, Column, ForeignKey
-from sqlalchemy.orm import relationship
-from routes.projects.model import Project
 
 
 class Errorlog(Base):

@@ -1,8 +1,10 @@
 from typing import Sequence
 
-from common.schema import make_named_response
-from . import model
 from pydantic import BaseModel, Field
+
+from common.schema import make_named_response
+
+from . import model
 
 
 class ProjectCreateParams(BaseModel):
@@ -15,8 +17,10 @@ class LogFileCreateParams(BaseModel):
 
 
 class ProjectPermsParams(BaseModel):
-    userid: int = Field(..., description="유저 ID")
-    projectid: int = Field(..., description="프로젝트 ID")
+    user_id: int = Field(..., description="유저 ID", alias="userid")
+    project_id: int = Field(..., description="프로젝트 ID", alias="projectid")
+
+    model_config = {"populate_by_name": True}
 
 
 class ProjectPermsBatchParams(BaseModel):

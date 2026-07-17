@@ -1,14 +1,15 @@
-import logging
-from typing import Any, Coroutine, Sequence
+from typing import Sequence
 
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.status import HTTP_400_BAD_REQUEST
-from routes.user import service as user_service
-from fastapi import HTTPException
-import os
+
 from common.enums import Permissions
 from common.logger_setup import get_logger
-from . import schema, service, model
+from common.path_utils import assert_allowed_log_path
+from routes.user import service as user_service
+
+from . import model, schema, service
 
 logger = get_logger()
 
@@ -16,16 +17,10 @@ logger = get_logger()
 async def add_logfile(
     conn: AsyncSession, project_id: int, item: schema.LogFileCreateParams
 ) -> model.LogFile:
-    logpath = item.path
-    logger.info(f"Adding logfile at path: {logpath}")
-    if os.path.exists(logpath) and os.path.isfile(logpath):
-        logfile = await service.add_logfile(conn, project_id, item)
-        return logfile
-    else:
-        raise HTTPException(
-            status_code=HTTP_400_BAD_REQUEST,
-            detail=f"Log file path does not exist or is not a file: {logpath}",
-        )
+    real_path = assert_allowed_log_path(item.path, must_exist=True)
+    logger.info("Adding logfile at path: %s", real_path)
+    safe_item = schema.LogFileCreateParams(name=item.name, path=real_path)
+    return await service.add_logfile(conn, project_id, safe_item)
 
 
 async def get_projects(conn: AsyncSession, userid: int) -> Sequence[model.Project]:

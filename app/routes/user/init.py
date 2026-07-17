@@ -1,10 +1,10 @@
-from common.logger_setup import get_logger
-from . import model, service
-from common.sqlsession import async_session
+
 from common import getenvval, hash_password
 from common.enums import Permissions
-import logging
+from common.logger_setup import get_logger
+from common.sqlsession import async_session
 
+from . import model, service
 
 logger = get_logger()
 
@@ -38,7 +38,7 @@ async def init_superuser():
                 "1번 사용자(슈퍼유저)가 이미 존재합니다. 아무 작업도 수행하지 않습니다."
             )
             return
-        except:
+        except Exception:
             user = model.User(
                 username=username,
                 password=hash_password(password),
@@ -47,6 +47,7 @@ async def init_superuser():
             conn.add(user)
             await conn.commit()
             logger.info(
-                f"슈퍼유저 계정이 생성되었습니다({username}, {password}). 즉시 비밀번호를 바꿔주세요."
+                "슈퍼유저 계정이 생성되었습니다(username=%s). 즉시 비밀번호를 바꿔주세요.",
+                username,
             )
             return

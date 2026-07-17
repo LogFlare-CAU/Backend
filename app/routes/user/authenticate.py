@@ -1,17 +1,19 @@
-import logging
 import time
-from functools import wraps
 
-from fastapi import HTTPException, Security, Depends, Request
+from fastapi import Depends, HTTPException, Request, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.status import (
+    HTTP_400_BAD_REQUEST,
     HTTP_401_UNAUTHORIZED,
     HTTP_403_FORBIDDEN,
-    HTTP_400_BAD_REQUEST,
 )
+
 from common.enums import Permissions
 from common.jwt_utils import decode_jwt
 from common.logger_setup import get_logger
+from common.sqlsession import _get_db
+
 from . import service
 
 """
@@ -27,23 +29,14 @@ bearer_scheme = HTTPBearer(
 )
 
 
-async def _require_moderator(
-    credentials: HTTPAuthorizationCredentials = Security(bearer_scheme),
-) -> None:
-    payload = await _require_login(credentials)
-    perm = int(payload.get("perm", 0))
-    if perm < int(Permissions.MODERATOR):
-        raise HTTPException(HTTP_403_FORBIDDEN, "Insufficient permission")
-    return None
-
-
 async def _require_login(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Security(bearer_scheme),
+    conn: AsyncSession = Depends(_get_db),
 ) -> dict:
     """
     raises 400 or 401 HTTPException if token is missing, invalid, or expired.
-    :param credentials:
-    :return:
+    Verifies JWT, DB presence (revocation), and loads live permission from DB.
     """
     if (
         credentials is None
@@ -57,30 +50,60 @@ async def _require_login(
         )
     token = credentials.credentials
     try:
-        payload = decode_jwt(token)  # 서명/무결성 검증 포함 가정
+        payload = decode_jwt(token)
     except Exception as e:
         raise HTTPException(
             status_code=HTTP_401_UNAUTHORIZED,
             detail="Invalid token",
             headers={"WWW-Authenticate": "Bearer"},
         ) from e
-    # 만료 검증(라이브러리에서 처리 안될 가능성 대비)
-    exp = int(payload.get("expire_at", 0))
-    if exp and int(time.time()) > exp >= 0:
+
+    db_token = await service.get_token_by_value(conn, token)
+    if db_token is None:
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if db_token.exp is not None and db_token.exp >= 0 and int(time.time()) > db_token.exp:
+        await service.delete_token(conn, db_token)
         raise HTTPException(
             status_code=HTTP_401_UNAUTHORIZED,
             detail="Token has expired",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    user_idx = payload.get("idx")
+    if user_idx is None:
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if db_token.user_idx != user_idx:
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user = await service.get_user_byid(conn, int(user_idx))
+    request.state.user_id = user.idx
+    request.state.user = user
+    request.state.auth_payload = payload
     return payload
 
 
-async def _crosscheck_token(
+async def _require_moderator(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Security(bearer_scheme),
+    conn: AsyncSession = Depends(_get_db),
 ) -> None:
-    payload = await _require_login(credentials)
-    # TODO: DB 에서 토큰 크로스체크
-    # 근데 어차피 JWT 라서 DB 조회가 필요할까?
+    await _require_login(request, credentials, conn)
+    user = getattr(request.state, "user", None)
+    perm = int(getattr(user, "permission", 0) if user is not None else 0)
+    if perm < int(Permissions.MODERATOR):
+        raise HTTPException(HTTP_403_FORBIDDEN, "Insufficient permission")
     return None
 
 
@@ -89,12 +112,23 @@ require_login = [Depends(_require_login)]
 
 
 def get_userid(request: Request) -> int:
+    user_id = getattr(request.state, "user_id", None)
+    if user_id is not None:
+        return int(user_id)
+    # Fallback for safety if a handler forgot require_login (still validates JWT).
     user = request.headers.get("Authorization", None)
     if not user:
         raise HTTPException(HTTP_401_UNAUTHORIZED, detail="Invalid token")
-    token = user.split(" ")[1]
+    parts = user.split(" ")
+    if len(parts) != 2:
+        raise HTTPException(HTTP_401_UNAUTHORIZED, detail="Invalid token")
     try:
-        payload = decode_jwt(token)
-        return payload.get("idx")
+        payload = decode_jwt(parts[1])
+        idx = payload.get("idx")
+        if idx is None:
+            raise HTTPException(HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        return int(idx)
+    except HTTPException:
+        raise
     except Exception:
         raise HTTPException(HTTP_401_UNAUTHORIZED, detail="Invalid token")

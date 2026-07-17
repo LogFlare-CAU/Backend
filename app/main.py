@@ -1,19 +1,25 @@
 import traceback
 from contextlib import asynccontextmanager
-from typing import Optional, Any
+from pathlib import Path
+from typing import Any, Optional
+
 from fastapi import (
     FastAPI,
     Request,
     status,
+)
+from fastapi import (
     HTTPException as FastAPIHTTPException,
 )
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy.exc import IntegrityError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
 from common.env_utils import getenvval
 from common.fcm import init as fcm_init
-from common.logger_setup import setup_uvicorn_file_logging, get_logger
+from common.logger_setup import get_logger, setup_uvicorn_file_logging
 from common.schema import ErrorResponse
 
 # ===========================================================================
@@ -24,10 +30,11 @@ description = "LogFlare API 서버"
 setup_uvicorn_file_logging()
 logger = get_logger()
 fcm_init()
-with open("./res/index.html", "r", encoding="utf-8") as f:
+_INDEX_HTML = Path(__file__).resolve().parent / "res" / "index.html"
+with open(_INDEX_HTML, "r", encoding="utf-8") as f:
     index_html_content = f.read()
 # ===========================INCLUE ROUTERS HERE===========================
-from routes import user, projects, logs, fcm
+from routes import fcm, logs, projects, user
 
 
 @asynccontextmanager
@@ -86,23 +93,22 @@ async def starlette_http_exception_handler(
 # --- 무결성 제약 위반(중복/FK 등) 409 ---
 @app.exception_handler(IntegrityError)
 async def integrity_error_handler(request: Request, exc: IntegrityError):
-    # logger.error(...) 원하면 추가
-    detail = getattr(exc, "orig", None)
+    logger.error("Database integrity error: %s", exc)
     return _build_error(
         status.HTTP_409_CONFLICT,
         "Database integrity error (duplicate or constraint violation).",
-        data=str(detail) if detail else str(exc),
+        data=None,
     )
 
 
 # --- 검증 실패 422 ---
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    # logger.error(...) 원하면 추가
+    logger.warning("Request validation error: %s", exc.errors())
     return _build_error(
-        status.HTTP_422_UNPROCESSABLE_ENTITY,
+        getattr(status, "HTTP_422_UNPROCESSABLE_CONTENT", status.HTTP_422_UNPROCESSABLE_ENTITY),
         "Request validation error.",
-        data={"errors": exc.errors(), "body": exc.body},
+        data={"errors": jsonable_encoder(exc.errors())},
     )
 
 
@@ -110,11 +116,11 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 @app.exception_handler(Exception)
 async def generic_exception_handler(request: Request, exc: Exception):
     tb = traceback.format_exc()
-    # logger.error(...) 원하면 추가
+    logger.error("Unhandled exception:\n%s", tb)
     return _build_error(
         status.HTTP_500_INTERNAL_SERVER_ERROR,
         "An unexpected server error occurred.",
-        data={"traceback": tb},  # 운영환경에선 노출 최소화 권장
+        data=None,
     )
 
 

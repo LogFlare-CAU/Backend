@@ -1,5 +1,4 @@
 import logging
-from logging.handlers import RotatingFileHandler
 
 FMT = "%(asctime)s:%(levelname)s:%(name)s:%(message)s"
 CONSOLE_FMT = "%(levelname)s:%(message)s"
@@ -33,7 +32,6 @@ def setup_uvicorn_file_logging() -> None:
     )
     targets = [logging.getLogger(n) for n in target_names]
 
-    formatter = logging.Formatter(FMT, DATEFMT)
     console_formatter = logging.Formatter(CONSOLE_FMT)
 
     # info_handler = RotatingFileHandler(infofile, mode="w", encoding="utf-8")

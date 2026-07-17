@@ -1,5 +1,6 @@
-from common.basemodel import Base
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, Text
+
+from common.basemodel import Base
 
 
 class FCMToken(Base):
