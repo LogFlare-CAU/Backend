@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime, date, time
+from datetime import date, datetime, time
 from decimal import Decimal
-from uuid import UUID
 from typing import Any, Callable
+from uuid import UUID
 
 from sqlalchemy import inspect
 from sqlalchemy.orm import DeclarativeBase, RelationshipDirection

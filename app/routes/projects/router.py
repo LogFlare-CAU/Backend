@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Request
-from common.sqlsession import get_db
-from common.schema import response_maker as rm, APIResponse, StringResponse
-from routes.user.authenticate import require_moderator, require_login, get_userid
-from common.jwt_utils import decode_jwt
-from . import schema, service, application
 
-from routes.projects.model import Project
+from common.schema import APIResponse
+from common.schema import response_maker as rm
+from common.sqlsession import get_db
+from routes.user.authenticate import get_userid, require_login, require_moderator
+
+from . import application, schema, service
 
 router = APIRouter(prefix="/project", tags=["projects"])
 
@@ -37,7 +37,8 @@ async def create_project(
     새로운  프로젝트를 생성합니다. 프로젝트 생성에 성공하면 프로젝트 토큰을 반환합니다.
     """
     project = await service.create_project(conn, items)
-    return APIResponse(data=project)
+    payload = {c.name: getattr(project, c.name) for c in project.__table__.columns}
+    return APIResponse(data=payload)
 
 
 @router.patch(
@@ -63,6 +64,22 @@ async def update_project(
 async def delete_project(request: Request, projectid: int, conn=get_db) -> APIResponse:
     await service.delete_project(conn, projectid)
     return APIResponse()
+
+
+@router.post(
+    "/{projectid}/rotate-token",
+    summary="프로젝트 API 키 재발급",
+    dependencies=require_moderator,
+    responses=rm([401, 403, 404]),
+    response_model=schema.ProjectResponseWithToken,
+)
+async def rotate_project_token(
+        request: Request, projectid: int, conn=get_db
+) -> APIResponse:
+    """기존 ProjectKey를 무효화하고 새 opaque 키를 발급합니다."""
+    project = await service.rotate_project_token(conn, projectid)
+    payload = {c.name: getattr(project, c.name) for c in project.__table__.columns}
+    return APIResponse(data=payload)
 
 
 @router.post(

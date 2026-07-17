@@ -1,168 +1,82 @@
-<h1 align="center">🚀 LogFlare Backend Server</h1>
+# LogFlare Backend Server
 
+FastAPI backend that centralizes log/error ingestion for registered projects. Each project has an opaque API key (`ProjectKey`). Responses use a standard envelope; live Swagger UI is disabled (schema is published separately).
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Python-3.12-blue?logo=python" alt="Python">
-  <img src="https://img.shields.io/badge/FastAPI-0.115+-brightgreen?logo=fastapi" alt="FastAPI">
-  <img src="https://img.shields.io/badge/SQLAlchemy-2.x-orange?logo=python" alt="SQLAlchemy">
-  <img src="https://img.shields.io/badge/Alembic-Migrations-lightgrey?logo=python" alt="Alembic">
-</p>
+## Requirements
 
-FastAPI 기반의 백엔드 서버로, 공통 스키마 구조와 응답 형식을 일관되게 유지하는 로깅 중심 RESTful API 프로젝트입니다.
-모든 API는 **표준화된 응답 포맷**과 **자동 Swagger 문서화**를 지원합니다.
+* Python 3.12+
+* SQLite by default (`LOGFLARE_DATABASE_URL` overridable)
 
----
-
-## ✅ 요구 사항
-
-* Python 3.12
-* SQLite (기본값, `init_db.py` 사용 시 자동 생성)
-
----
-
-## ⚙️ 실행 방법
-
-### 1. 개발 환경 설정
-
-Python 3.12 환경에서 개발 중입니다.
+## Setup
 
 ```bash
 python -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+cp logflare.env.copy logflare.env   # or export vars; Compose uses logflare.env
+# Edit JWT_SECRET, SUPERUSER_*, FCM_*, LOGFLARE_LOG_ROOTS
 ```
 
-### 2. 환경 변수 설정
-
-필요한 환경 변수 템플릿은 `logflare.env.copy`에 있습니다.
-
-```bash
-cp logflare.env.copy .env
-```
-
-필요에 따라 `.env` 값을 수정하세요. (예: FCM 키 파일 경로)
-
-### 3. DB 생성
-
-동봉된 `init_db.py` 스크립트를 사용하여 초기 데이터베이스를 생성합니다.
+## Database
 
 ```bash
 python app/init_db.py
 ```
 
-해당 파일을 실행하면 언제든지 초기 DB 상태로 복원할 수 있습니다.
+This **deletes only the SQLite DB file** and runs `alembic upgrade head`. Migration scripts under `app/alembic/migrations/` are kept and should be committed.
 
-### 4. 실행
+Alembic: run commands from `app/alembic/` (`script_location = migrations`).
 
-```bash
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
+## Run
 
-서버가 시작되면 기본 엔드포인트는 `http://localhost:8000` 입니다.
-
----
-
-## 🧩 디렉토리 구조 및 역할
-
-### `app/common`
-
-백엔드 전역에서 공통으로 사용하는 상수, 함수, 예외, 스키마 등을 포함합니다.
-
-### `app/routes`
-
-프로젝트의 핵심 기능이 구현된 디렉토리로, 각 API의 세부 로직을 담당합니다.
-
-| 파일명              | 역할 설명                               |
-| ---------------- | ----------------------------------- |
-| `model.py`       | DB ORM 선언                           |
-| `schema.py`      | DTO 선언                              |
-| `service.py`     | DB 입출력(CRUD) 로직                     |
-| `application.py` | 외부 API 연동 등 복합 로직 (Service보다 상위 개념) |
-| `router.py`      | FastAPI 라우터 및 엔드포인트 선언              |
-
----
-
-## 📡 API 응답 형식
-
-모든 API는 다음과 같은 JSON 형식을 반환합니다.
-
-```json
-{
-  "success": true,
-  "message": "success",
-  "error_code": 0,
-  "data": {}
-}
-```
-
-* `success`: 요청 성공 여부
-* `message`: 처리 상태 메시지
-* `error_code`: 에러 코드 (0이면 정상)
-* `data`: 실제 응답 데이터
-
-> → 즉, `success`를 확인하는 것만으로 요청의 성공 여부를 판단할 수 있습니다.
-
----
-
-## 🧱 Swagger 템플릿 예시
-
-### 응답 DTO 정의
-
-```python
-from common.schema import make_named_response
-from typing import Sequence
-from .model import User
-
-UserResponse = make_named_response(User, "UserResponse")
-UserSequenceResponse = make_named_response(Sequence[User], "UserSequenceResponse")
-```
-
-### 라우터 정의
-
-```python
-from . import schema
-from common.schema import response_maker
-
-@router.get("/", response_model=schema.UserResponse, responses=response_maker([404, 403]))
-async def get_users(request: Request):
-    return APIResponse
-```
-
-### 설명
-
-* `make_named_response`: SQLAlchemy ORM 객체를 Swagger에서 읽을 수 있는 DTO로 변환
-* `response_model`: Swagger 문서에 명시되는 실제 응답 구조 지정
-* `response_maker`: 공통 에러 응답 형식(404, 403 등)을 자동 등록
-
----
-
-## 🧠 추가 참고
-
-* Swagger UI는 `/docs` 엔드포인트에서 자동 생성됩니다.
-* 모든 API는 `common.schema.APIResponse`를 상속하거나 `response_maker`를 통해 일관된 응답을 보장합니다.
-* 기본 포트는 `LOGFLARE_API_PORT` 환경 변수로 변경할 수 있습니다.
-
----
-
-## 🛠️ 간단 CLI (프로젝트/로그파일 관리)
-
-DB에 직접 프로젝트를 생성하거나 로그 파일을 추가할 수 있는 **interactive CLI**를 제공합니다.
+Imports are rooted at `app/` (see `CLAUDE.md`). Prefer:
 
 ```bash
+cd app
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+# or: python main.py   # uses LOGFLARE_API_PORT
+```
+
+Docker Compose (optional, local ops):
+
+```bash
+# Optional machine-specific binds:
+cp compose.override.example.yaml docker-compose.override.yaml
+docker compose up -d --build
+```
+
+## Tests / lint
+
+```bash
+pytest
+ruff check app tests scripts
+```
+
+## API notes
+
+* Envelope: `{ success, message, error_code, data }`
+* User auth: `Authorization: Bearer <jwt>` (finite TTL; DB-backed revocation)
+* Project ingest: headers `Project` + `ProjectKey: Bearer <opaque-key>`
+* Rotate project key: `POST /project/{id}/rotate-token` (moderator)
+* Logfile paths must be under `LOGFLARE_LOG_ROOTS` (comma-separated)
+* Interactive docs are off on the live app (`docs_url=None`). Published schema:
+  [Swagger viewer](https://macqueen0987.github.io/swagger-viewer/?spec=https://raw.githubusercontent.com/LogFlare-CAU/Backend/openapi-jsons/openapi.json)
+
+## CLI
+
+```bash
+cd app
 python projectmanager.py
 ```
 
-```bash
-1) List projects
-2) Create project
-3) Delete project
-4) Rename project
-5) List logfiles in project
-6) Add logfile to project
-7) Delete logfile from project
-8) Update logfile in project
-0) Exit
-```
+## Env template (`logflare.env.copy`)
 
-## 🌐 Swagger 문서
-[이곳에서 확인 가능합니다.](https://macqueen0987.github.io/swagger-viewer/?spec=https://raw.githubusercontent.com/LogFlare-CAU/Backend/openapi-jsons/openapi.json)
+| Variable | Purpose |
+|----------|---------|
+| `JWT_SECRET` | User JWT HMAC secret |
+| `LOGFLARE_API_PORT` | Listen port when using `python main.py` |
+| `LOGFLARE_API_ROOT_PATH` | FastAPI `root_path` (reverse proxy) |
+| `LOGFLARE_DATABASE_URL` | Async SQLAlchemy URL |
+| `LOGFLARE_LOG_ROOTS` | Allowed logfile directory roots |
+| `SUPERUSER_NAME` / `SUPERUSER_PASSWORD` | Bootstrap admin |
+| `FCM_KEY_FILE` / `FCM_GOOGLE_FILE` | Firebase credentials paths |

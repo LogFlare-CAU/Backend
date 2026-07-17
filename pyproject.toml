@@ -1,0 +1,21 @@
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+pythonpath = ["app"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["app", "tests", "scripts"]
+extend-exclude = ["app/alembic/migrations/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
+ignore = ["E501", "E402", "E722"]
+
+[tool.ruff.lint.per-file-ignores]
+"app/**/__init__.py" = ["F401"]
+"app/alembic/**" = ["E402", "F401", "W291"]
+"tests/conftest.py" = ["E402", "F401"]
+"app/main.py" = ["E402"]

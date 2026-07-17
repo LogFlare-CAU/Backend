@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from datetime import date, datetime, time
 from decimal import Decimal
-from typing import Any, Optional, Type, List, get_origin, get_args
+from typing import Any, List, Optional, Type, get_args, get_origin
 from uuid import UUID
 
-from pydantic import BaseModel, Field, create_model, ConfigDict
-from sqlalchemy import Enum as SAEnum, Column
+from pydantic import BaseModel, ConfigDict, Field, create_model
+from sqlalchemy import Column
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import DeclarativeMeta
 
 from common.schema.common import APIResponse
-
 
 # ==============================
 # 민감 필드 설정 (DTO에서 완전 제거)

@@ -1,8 +1,11 @@
-from fastapi import APIRouter, Request, Depends
-from common.schema import APIResponse, response_maker as r_make, StringResponse
+from fastapi import APIRouter, Request
+
+from common.schema import APIResponse, StringResponse
+from common.schema import response_maker as r_make
 from common.sqlsession import get_db
-from . import model, schema, application, service
-from .authenticate import require_moderator, require_login, get_userid
+
+from . import application, schema, service
+from .authenticate import get_userid, require_login, require_moderator
 
 router = APIRouter(prefix="/user", tags=["user"])
 
@@ -101,14 +104,14 @@ async def reset_user_password(
         conn=get_db,
 ):
     """
-    사용자의 비밀번호를 초기화합니다. 초기화된 비밀번호는 "password"입니다.<br>
+    사용자의 비밀번호를 지정한 값으로 재설정합니다.<br>
     로그인 토큰이 필요하며, 관리자 권한이 있어야 합니다.<br>
     <br>
     403: 권한 없음<br>
     404: 사용자를 찾을 수 없음<br>
     """
     await service.reset_user_password(conn, useridx, item.new_password)
-    return APIResponse(data="Password has been reset to 'password'.")
+    return APIResponse(data="Password has been reset.")
 
 
 @router.patch(

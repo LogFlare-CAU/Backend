@@ -1,0 +1,35 @@
+services:
+  logflare:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: aitg/logflare
+    container_name: logflare
+    restart: unless-stopped
+    env_file:
+      - ./logflare.env
+    volumes:
+      - ./app:/app
+      - ./logs:/logs
+      - ./logflare_env:/env
+      # Host-specific log mounts: use docker-compose.override.yaml (see compose.override.example.yaml)
+    working_dir: /app
+    command:
+      - python3
+      - main.py
+    expose:
+      - 80
+    ports:
+      - "8256:80"
+    networks:
+      - cloudflare-tunnel
+      - logflare
+
+networks:
+  logflare:
+    external:
+      true
+  cloudflare-tunnel:
+    external:
+      true
+    name: cloudflare-tunnel

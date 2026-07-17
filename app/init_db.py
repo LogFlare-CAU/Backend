@@ -1,7 +1,10 @@
-# app/initdb.py
+# app/init_db.py
+"""Create/reset the SQLite database file and apply committed Alembic migrations.
+
+Does NOT delete migration scripts — schema history lives under app/alembic/migrations.
+"""
 import os
 import sys
-import shutil
 from pathlib import Path
 
 
@@ -11,35 +14,42 @@ def run(cmd: str) -> int:
 
 
 def main():
-    print("WARNING: This will DELETE existing database and migrations!")
+    print("WARNING: This will DELETE the existing SQLite database file!")
+    print("Alembic migration scripts under app/alembic/migrations will be kept.")
     input("Press Enter to continue or Ctrl-C to abort...")
 
     project_root = Path(__file__).resolve().parents[0]
     dbfile = project_root / "db" / "mydb.sqlite"
-    env_py = project_root / "alembic" / "migrations" / "env.py"
-    env_py_copy = project_root / "alembic" / "env.py.copy"
-    migraions_dir = project_root / "alembic" / "migrations"
+    alembic_dir = project_root / "alembic"
+    versions = alembic_dir / "migrations" / "versions"
+
+    if not versions.exists() or not any(versions.glob("*.py")):
+        print("ERROR: No Alembic revisions found under alembic/migrations/versions/")
+        print("Commit migration scripts before running init_db.")
+        sys.exit(1)
 
     if dbfile.exists():
         print("Deleting existing database")
         dbfile.unlink()
 
-    if migraions_dir.exists():
-        print("Deleting existing migrations")
-        shutil.rmtree(migraions_dir)
+    dbfile.parent.mkdir(parents=True, exist_ok=True)
 
-    os.chdir(project_root)
-    os.chdir("./alembic")
-    run("alembic init migrations")
-    env_py.unlink()
-    shutil.copyfile(env_py_copy, env_py)
-    run("alembic revision --autogenerate")
-    run("alembic upgrade head")
-    print("Database initialized.")
+    os.chdir(alembic_dir)
+    code = run("alembic upgrade head")
+    if code != 0:
+        print("ERROR: alembic upgrade failed")
+        sys.exit(code or 1)
 
-    if not dbfile.exists():
-        print("ERROR: Database file was not created!")
-        sys.exit(1)
+    # SQLite file path is relative to alembic CWD in some configs; also check app/db
+    candidates = [
+        dbfile,
+        alembic_dir / "db" / "mydb.sqlite",
+        project_root / "db" / "mydb.sqlite",
+    ]
+    if not any(p.exists() for p in candidates):
+        print("WARNING: Database file not found at expected paths; check alembic URL.")
+    else:
+        print("Database initialized.")
 
 
 if __name__ == "__main__":

@@ -1,22 +1,25 @@
-from fastapi import APIRouter, Request, BackgroundTasks
+from fastapi import APIRouter, BackgroundTasks, Request
 from fastapi.responses import Response
-from common.sqlsession import get_db
+
 from common.schema import (
-    response_maker as rm,
     APIResponse,
-    StringResponse,
     StringSequenceResponse,
 )
-from routes.projects.authenticate import require_project_auth, get_project_id
-from routes.user.authenticate import require_login, get_userid
-from . import schema, application, service, tasks
+from common.schema import (
+    response_maker as rm,
+)
+from common.sqlsession import get_db
+from routes.projects.authenticate import get_project_id, require_project_auth
+from routes.user.authenticate import get_userid, require_login
+
+from . import application, schema, service, tasks
 
 router = APIRouter(prefix="/log", tags=["log"])
 
 
-@router.get("/")
+@router.get("/", response_model=APIResponse)
 async def health_check():
-    return {"status": "ok"}
+    return APIResponse(data={"status": "ok"})
 
 
 @router.get(
@@ -62,10 +65,12 @@ async def log_error(
     404: 프로젝트 없음<br>
     204: 로그 수신 성공
     """
+    if log.test:
+        return Response(status_code=204)
     projectid = get_project_id(request)
     error = await service.log_error(conn, projectid, log)
-    bg_tasks.add_task(tasks.notify_error, conn=conn, error=error, projectid=projectid)
-    return Response()
+    bg_tasks.add_task(tasks.notify_error, error_id=error.id, projectid=projectid)
+    return Response(status_code=204)
 
 
 @router.get(

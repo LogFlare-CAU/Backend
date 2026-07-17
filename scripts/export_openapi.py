@@ -2,6 +2,7 @@ import importlib
 import json
 import sys
 from pathlib import Path
+
 from fastapi import FastAPI
 
 ROOT_DIR = Path(__file__).resolve().parents[1]

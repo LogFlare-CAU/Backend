@@ -1,10 +1,15 @@
-from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import HTTPException
-from starlette.status import HTTP_403_FORBIDDEN
-from typing import Sequence
 import re
-from . import service, model
-from routes.projects import application as project_app, service as project_service
+from typing import Sequence
+
+from fastapi import HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.status import HTTP_403_FORBIDDEN
+
+from common.path_utils import assert_allowed_log_path
+from routes.projects import application as project_app
+from routes.projects import service as project_service
+
+from . import model, service
 
 LOG_START_RE = re.compile(
     r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \s*\|\s*\w+\s*\|"
@@ -16,22 +21,9 @@ async def get_errors(
 ) -> Sequence[model.Errorlog]:
     perms = await project_app.get_projects(conn, userid)
     project_ids = [p.id for p in perms]
-    cnt = 0
-    returnval = []
-    while True:
-        logs = await service.get_errors(conn, limit, offset, sort)
-        if not logs:
-            break
-        for log in logs:
-            if log.project_id in project_ids:
-                returnval.append(log)
-        if len(returnval) >= limit:
-            break
-        offset += limit
-        cnt += 1
-        if cnt > 5:  # Prevent infinite loop
-            break
-    return returnval[:limit]
+    return await service.get_errors_for_projects(
+        conn, project_ids, limit, offset, sort
+    )
 
 
 async def get_errors_by_projectid(
@@ -65,7 +57,8 @@ async def read_log(
             HTTP_403_FORBIDDEN, detail="You do not have access to this project"
         )
     logfile = await project_service.get_logfile(conn, projectid, logfileid)
-    with open(logfile.file_path, "r", encoding="utf-8") as f:
+    real_path = assert_allowed_log_path(logfile.file_path, must_exist=True)
+    with open(real_path, "r", encoding="utf-8") as f:
         lines = f.readlines()
     entries = group_log_entries(lines)
     if sort == "newest":

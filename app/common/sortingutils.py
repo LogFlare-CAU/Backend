@@ -1,4 +1,5 @@
 from sqlalchemy import case
+
 from routes.logs.enum import Level
 
 LEVEL_ORDER = [
