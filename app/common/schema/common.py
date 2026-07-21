@@ -38,6 +38,7 @@ def response_maker(include: list[int] = None) -> dict[int, dict]:
         404: "Not Found",
         409: "Conflict",
         422: "Validation Error",
+        429: "Too Many Requests",
         500: "Server Error",
     }
     if include is None:

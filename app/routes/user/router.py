@@ -60,7 +60,7 @@ async def get_current_user(request: Request, conn=get_db):
     return APIResponse(data=dict(res))
 
 
-@router.post("/auth", response_model=StringResponse, responses=r_make([401, 404]))
+@router.post("/auth", response_model=StringResponse, responses=r_make([401, 404, 429]))
 async def authenticate_user(
         request: Request, auth_data: schema.UserAuthParams, conn=get_db
 ):
@@ -69,9 +69,11 @@ async def authenticate_user(
     토큰은 jwt 토큰입니다.<br>
     <br>
     401: 인증 실패<br>
-    404: 사용자를 찾을 수 없음
+    404: 사용자를 찾을 수 없음<br>
+    429: 로그인 시도 횟수 초과<br>
     """
-    res = await application.authenticate_user(conn, auth_data)
+    client_ip = request.client.host if request.client else "unknown"
+    res = await application.authenticate_user(conn, auth_data, client_ip)
     return APIResponse(data=res)
 
 
