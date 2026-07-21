@@ -51,7 +51,7 @@ Study-era FastAPI backend with a solid response envelope and feature-module spli
 | ID | Priority | Action | Effort | Risk | Owner / status |
 |----|----------|--------|--------|------|----------------|
 | CH-2026-07-15-01..16 | — | See remediation log | — | — | done (2026-07-15) |
-| CH-2026-07-15-18 | 4 | Login rate limit | M | low | deferred |
+| CH-2026-07-15-18 | 4 | Login rate limit | M | low | done (2026-07-21) |
 
 ## Open questions
 
@@ -79,4 +79,4 @@ Study-era FastAPI backend with a solid response envelope and feature-module spli
 | 2026-07-15 | CH-2026-07-15-15 | done | README/CLAUDE/env template/compose hygiene |
 | 2026-07-15 | CH-2026-07-15-16 | done | pytest smoke + ruff CI workflow; pinned `requirements.txt` |
 | 2026-07-15 | CH-2026-07-15-17 | done | Stub removed / auth path cleaned |
-| 2026-07-15 | CH-2026-07-15-18 | deferred | Login rate limiting left for later |
+| 2026-07-21 | CH-2026-07-15-18 | done | Per (IP, username) fixed-window login rate limit (429), configurable via `LOGIN_RATE_LIMIT_MAX_ATTEMPTS`/`LOGIN_RATE_LIMIT_WINDOW_SECONDS` |

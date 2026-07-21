@@ -36,6 +36,26 @@ async def test_login_wrong_password(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_login_rate_limited_after_repeated_failures(client: AsyncClient):
+    from common.rate_limit import _MAX_ATTEMPTS
+
+    payload = {"username": "admin", "password": "wrongpass", "keep_logged_in": False}
+    for _ in range(_MAX_ATTEMPTS):
+        res = await client.post("/user/auth", json=payload)
+        assert res.status_code == 401
+
+    blocked = await client.post("/user/auth", json=payload)
+    assert blocked.status_code == 429
+
+    # Even the correct password is blocked while the window is active.
+    still_blocked = await client.post(
+        "/user/auth",
+        json={"username": "admin", "password": "adminpass1", "keep_logged_in": False},
+    )
+    assert still_blocked.status_code == 429
+
+
+@pytest.mark.asyncio
 async def test_missing_auth_rejected(client: AsyncClient):
     res = await client.get("/user/me")
     assert res.status_code in (400, 401)

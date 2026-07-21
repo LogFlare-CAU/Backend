@@ -45,6 +45,9 @@ from routes.user import model as user_model  # noqa: E402
 
 @pytest_asyncio.fixture(autouse=True)
 async def setup_db():
+    from common.rate_limit import _attempts as _login_rate_limit_attempts
+
+    _login_rate_limit_attempts.clear()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
