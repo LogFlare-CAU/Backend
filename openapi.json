@@ -229,7 +229,7 @@
           "user"
         ],
         "summary": "Authenticate User",
-        "description": "사용자를 인증합니다. 만일 인증에 성공하면 해당 사용자의 토큰을 반환합니다.<br>\n토큰은 jwt 토큰입니다.<br>\n<br>\n401: 인증 실패<br>\n404: 사용자를 찾을 수 없음",
+        "description": "사용자를 인증합니다. 만일 인증에 성공하면 해당 사용자의 토큰을 반환합니다.<br>\n토큰은 jwt 토큰입니다.<br>\n<br>\n401: 인증 실패<br>\n404: 사용자를 찾을 수 없음<br>\n429: 로그인 시도 횟수 초과<br>",
         "operationId": "authenticate_user_user_auth_post",
         "requestBody": {
           "content": {
@@ -247,7 +247,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StringResponse"
+                  "$ref": "#/components/schemas/APIResponse_str_"
                 }
               }
             }
@@ -264,6 +264,16 @@
           },
           "404": {
             "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
             "content": {
               "application/json": {
                 "schema": {
@@ -291,7 +301,7 @@
           "user"
         ],
         "summary": "Reset User Password",
-        "description": "사용자의 비밀번호를 초기화합니다. 초기화된 비밀번호는 \"password\"입니다.<br>\n로그인 토큰이 필요하며, 관리자 권한이 있어야 합니다.<br>\n<br>\n403: 권한 없음<br>\n404: 사용자를 찾을 수 없음<br>",
+        "description": "사용자의 비밀번호를 지정한 값으로 재설정합니다.<br>\n로그인 토큰이 필요하며, 관리자 권한이 있어야 합니다.<br>\n<br>\n403: 권한 없음<br>\n404: 사용자를 찾을 수 없음<br>",
         "operationId": "reset_user_password_user__useridx__reset_password_post",
         "security": [
           {
@@ -325,7 +335,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StringResponse"
+                  "$ref": "#/components/schemas/APIResponse_str_"
                 }
               }
             }
@@ -810,6 +820,84 @@
         }
       }
     },
+    "/project/{projectid}/rotate-token": {
+      "post": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "프로젝트 API 키 재발급",
+        "description": "기존 ProjectKey를 무효화하고 새 opaque 키를 발급합니다.",
+        "operationId": "rotate_project_token_project__projectid__rotate_token_post",
+        "security": [
+          {
+            "Authorization": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Projectid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectResponseWithToken"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/project/{projectid}/logfile": {
       "post": {
         "tags": [
@@ -1225,7 +1313,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse"
+                }
               }
             }
           }
@@ -1300,7 +1390,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StringSequenceResponse"
+                  "$ref": "#/components/schemas/APIResponse_list_str__"
                 }
               }
             }
@@ -1533,7 +1623,7 @@
           "fcm"
         ],
         "summary": "Get Fcm Data",
-        "description": "앱에서 필요한 FCM 데이터를 리턴합니다.<br>\nFCM 관련 데이터를 가져옵니다.",
+        "description": "앱에서 필요한 최소 FCM 클라이언트 설정을 반환합니다.",
         "operationId": "get_fcm_data_fcm_data_get",
         "responses": {
           "200": {
@@ -1541,7 +1631,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/APIResponse_FCMConfig_"
+                  "$ref": "#/components/schemas/APIResponse_FCMClientConfig_"
                 }
               }
             }
@@ -1685,7 +1775,48 @@
   },
   "components": {
     "schemas": {
-      "APIResponse_FCMConfig_": {
+      "APIResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "API 호출 성공 여부",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "처리 결과에 대한 메시지",
+            "default": "success"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code",
+            "description": "에러 코드"
+          },
+          "data": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data",
+            "description": "API 호출 결과 데이터"
+          }
+        },
+        "type": "object",
+        "title": "APIResponse",
+        "description": "API 공통 응답 스키마"
+      },
+      "APIResponse_FCMClientConfig_": {
         "properties": {
           "success": {
             "type": "boolean",
@@ -1714,7 +1845,7 @@
           "data": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/FCMConfig"
+                "$ref": "#/components/schemas/FCMClientConfig"
               },
               {
                 "type": "null"
@@ -1724,7 +1855,94 @@
           }
         },
         "type": "object",
-        "title": "APIResponse[FCMConfig]"
+        "title": "APIResponse[FCMClientConfig]"
+      },
+      "APIResponse_list_str__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "API 호출 성공 여부",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "처리 결과에 대한 메시지",
+            "default": "success"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code",
+            "description": "에러 코드"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data",
+            "description": "API 호출 결과 데이터"
+          }
+        },
+        "type": "object",
+        "title": "StringSequenceResponse"
+      },
+      "APIResponse_str_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "API 호출 성공 여부",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "처리 결과에 대한 메시지",
+            "default": "success"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code",
+            "description": "에러 코드"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data",
+            "description": "API 호출 결과 데이터"
+          }
+        },
+        "type": "object",
+        "title": "StringResponse"
       },
       "ErrorParams": {
         "properties": {
@@ -1749,6 +1967,12 @@
             "type": "string",
             "title": "Message",
             "description": "에러 메시지"
+          },
+          "test": {
+            "type": "boolean",
+            "title": "Test",
+            "description": "테스트용 플래그",
+            "default": false
           }
         },
         "type": "object",
@@ -1884,7 +2108,7 @@
           "project": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO"
+                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO__3"
               },
               {
                 "type": "null"
@@ -1904,30 +2128,67 @@
         "title": "ErrorlogDTO",
         "description": "ErrorlogDTO"
       },
-      "FCMConfig": {
+      "FCMClientConfig": {
         "properties": {
-          "project_info": {
-            "$ref": "#/components/schemas/_ProjectInfo"
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
           },
-          "client": {
-            "items": {
-              "$ref": "#/components/schemas/_Client"
-            },
-            "type": "array",
-            "title": "Client"
+          "messaging_sender_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Messaging Sender Id"
           },
-          "configuration_version": {
-            "type": "string",
-            "title": "Configuration Version"
+          "mobilesdk_app_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mobilesdk App Id"
+          },
+          "package_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package Name"
+          },
+          "api_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
           }
         },
         "type": "object",
-        "required": [
-          "project_info",
-          "client",
-          "configuration_version"
-        ],
-        "title": "FCMConfig"
+        "title": "FCMClientConfig",
+        "description": "Minimal Firebase client fields needed by the mobile app."
       },
       "FCMTestParams": {
         "properties": {
@@ -2108,7 +2369,7 @@
           "data": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__LogFileDTO"
+                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__LogFileDTO__3"
               },
               {
                 "type": "null"
@@ -2402,99 +2663,14 @@
             "type": "string",
             "minLength": 8,
             "title": "New Password",
-            "description": "새 비밀번호",
-            "default": "password"
+            "description": "새 비밀번호"
           }
         },
         "type": "object",
+        "required": [
+          "new_password"
+        ],
         "title": "ResetPasswordParams"
-      },
-      "StringResponse": {
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "title": "Success",
-            "description": "API 호출 성공 여부",
-            "default": true
-          },
-          "message": {
-            "type": "string",
-            "title": "Message",
-            "description": "처리 결과에 대한 메시지",
-            "default": "success"
-          },
-          "error_code": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Error Code",
-            "description": "에러 코드"
-          },
-          "data": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Data",
-            "description": "API 호출 결과 데이터"
-          }
-        },
-        "type": "object",
-        "title": "StringResponse"
-      },
-      "StringSequenceResponse": {
-        "properties": {
-          "success": {
-            "type": "boolean",
-            "title": "Success",
-            "description": "API 호출 성공 여부",
-            "default": true
-          },
-          "message": {
-            "type": "string",
-            "title": "Message",
-            "description": "처리 결과에 대한 메시지",
-            "default": "success"
-          },
-          "error_code": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Error Code",
-            "description": "에러 코드"
-          },
-          "data": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Data",
-            "description": "API 호출 결과 데이터"
-          }
-        },
-        "type": "object",
-        "title": "StringSequenceResponse"
       },
       "UserAuthParams": {
         "properties": {
@@ -2538,8 +2714,7 @@
             "type": "string",
             "minLength": 8,
             "title": "Password",
-            "description": "사용자 비밀번호",
-            "default": "password"
+            "description": "사용자 비밀번호"
           },
           "permission": {
             "type": "integer",
@@ -2550,7 +2725,8 @@
         },
         "type": "object",
         "required": [
-          "username"
+          "username",
+          "password"
         ],
         "title": "UserCreateParams"
       },
@@ -2569,6 +2745,19 @@
             "type": "integer",
             "title": "Permission",
             "description": "사용자 권한, 아직 어떻게 쓸지 몰라서 0으로 초기화"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At",
+            "description": "마지막 수정 시각"
           }
         },
         "type": "object",
@@ -2736,6 +2925,13 @@
           "type": {
             "type": "string",
             "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
           }
         },
         "type": "object",
@@ -2745,178 +2941,6 @@
           "type"
         ],
         "title": "ValidationError"
-      },
-      "_AndroidClientInfo": {
-        "properties": {
-          "package_name": {
-            "type": "string",
-            "title": "Package Name"
-          }
-        },
-        "type": "object",
-        "required": [
-          "package_name"
-        ],
-        "title": "_AndroidClientInfo"
-      },
-      "_ApiKey": {
-        "properties": {
-          "current_key": {
-            "type": "string",
-            "title": "Current Key"
-          }
-        },
-        "type": "object",
-        "required": [
-          "current_key"
-        ],
-        "title": "_ApiKey"
-      },
-      "_AppInviteService": {
-        "properties": {
-          "other_platform_oauth_client": {
-            "items": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "array",
-            "title": "Other Platform Oauth Client"
-          }
-        },
-        "type": "object",
-        "required": [
-          "other_platform_oauth_client"
-        ],
-        "title": "_AppInviteService"
-      },
-      "_Client": {
-        "properties": {
-          "client_info": {
-            "$ref": "#/components/schemas/_ClientInfo"
-          },
-          "oauth_client": {
-            "items": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "array",
-            "title": "Oauth Client"
-          },
-          "api_key": {
-            "items": {
-              "$ref": "#/components/schemas/_ApiKey"
-            },
-            "type": "array",
-            "title": "Api Key"
-          },
-          "services": {
-            "$ref": "#/components/schemas/_Services"
-          }
-        },
-        "type": "object",
-        "required": [
-          "client_info",
-          "oauth_client",
-          "api_key",
-          "services"
-        ],
-        "title": "_Client"
-      },
-      "_ClientInfo": {
-        "properties": {
-          "mobilesdk_app_id": {
-            "type": "string",
-            "title": "Mobilesdk App Id"
-          },
-          "android_client_info": {
-            "$ref": "#/components/schemas/_AndroidClientInfo"
-          }
-        },
-        "type": "object",
-        "required": [
-          "mobilesdk_app_id",
-          "android_client_info"
-        ],
-        "title": "_ClientInfo"
-      },
-      "_ProjectInfo": {
-        "properties": {
-          "project_number": {
-            "type": "string",
-            "title": "Project Number"
-          },
-          "project_id": {
-            "type": "string",
-            "title": "Project Id"
-          },
-          "storage_bucket": {
-            "type": "string",
-            "title": "Storage Bucket"
-          }
-        },
-        "type": "object",
-        "required": [
-          "project_number",
-          "project_id",
-          "storage_bucket"
-        ],
-        "title": "_ProjectInfo"
-      },
-      "_Services": {
-        "properties": {
-          "appinvite_service": {
-            "$ref": "#/components/schemas/_AppInviteService"
-          }
-        },
-        "type": "object",
-        "required": [
-          "appinvite_service"
-        ],
-        "title": "_Services"
-      },
-      "common__schema__sqlalchemy_orm_converter__LogFileDTO": {
-        "properties": {
-          "id": {
-            "type": "integer",
-            "title": "Id",
-            "description": "ID"
-          },
-          "project_id": {
-            "type": "integer",
-            "title": "Project Id",
-            "description": "프로젝트 ID"
-          },
-          "file_path": {
-            "type": "string",
-            "title": "File Path",
-            "description": "로그 파일 경로 (서버 상 실제 경로, 파일명 포함)"
-          },
-          "file_name": {
-            "type": "string",
-            "title": "File Name",
-            "description": "로그 파일 이름 (보이는 용도)"
-          },
-          "project": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "project 관계"
-          }
-        },
-        "type": "object",
-        "required": [
-          "id",
-          "project_id",
-          "file_path",
-          "file_name"
-        ],
-        "title": "LogFileDTO",
-        "description": "LogFileDTO"
       },
       "common__schema__sqlalchemy_orm_converter__LogFileDTO__1": {
         "properties": {
@@ -2984,50 +3008,49 @@
         "title": "LogFileDTO",
         "description": "LogFileDTO"
       },
-      "common__schema__sqlalchemy_orm_converter__ProjectDTO": {
+      "common__schema__sqlalchemy_orm_converter__LogFileDTO__3": {
         "properties": {
           "id": {
             "type": "integer",
             "title": "Id",
             "description": "ID"
           },
-          "name": {
+          "project_id": {
+            "type": "integer",
+            "title": "Project Id",
+            "description": "프로젝트 ID"
+          },
+          "file_path": {
             "type": "string",
-            "title": "Name",
-            "description": "프로젝트 이름"
+            "title": "File Path",
+            "description": "로그 파일 경로 (서버 상 실제 경로, 파일명 포함)"
           },
-          "alias": {
+          "file_name": {
+            "type": "string",
+            "title": "File Name",
+            "description": "로그 파일 이름 (보이는 용도)"
+          },
+          "project": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO__3"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Alias",
-            "description": "프로젝트 별칭, 사용할지는 모르겠습니다"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description",
-            "description": "프로젝트 설명, 이것도 사용할지는 모르겠습니다"
+            "description": "project 관계"
           }
         },
         "type": "object",
         "required": [
           "id",
-          "name"
+          "project_id",
+          "file_path",
+          "file_name"
         ],
-        "title": "ProjectDTO",
-        "description": "ProjectDTO"
+        "title": "LogFileDTO",
+        "description": "LogFileDTO"
       },
       "common__schema__sqlalchemy_orm_converter__ProjectDTO__1": {
         "properties": {
@@ -3075,7 +3098,7 @@
           },
           "users": {
             "items": {
-              "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectPermsDTO"
+              "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectPermsDTO__1"
             },
             "type": "array",
             "title": "Users",
@@ -3163,7 +3186,52 @@
         "title": "ProjectDTO",
         "description": "ProjectDTO"
       },
-      "common__schema__sqlalchemy_orm_converter__ProjectPermsDTO": {
+      "common__schema__sqlalchemy_orm_converter__ProjectDTO__3": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "ID"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "프로젝트 이름"
+          },
+          "alias": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alias",
+            "description": "프로젝트 별칭, 사용할지는 모르겠습니다"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "프로젝트 설명, 이것도 사용할지는 모르겠습니다"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "ProjectDTO",
+        "description": "ProjectDTO"
+      },
+      "common__schema__sqlalchemy_orm_converter__ProjectPermsDTO__1": {
         "properties": {
           "id": {
             "type": "integer",
@@ -3254,7 +3322,7 @@
           "project": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO"
+                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO__3"
               },
               {
                 "type": "null"
@@ -3283,7 +3351,7 @@
       },
       "ProjectKeyHeader": {
         "type": "apiKey",
-        "description": "프로젝트 인증에 쓰이는 Bearer 토큰 (예: 'Bearer <JWT>')",
+        "description": "프로젝트 API 키 (예: 'Bearer <token>')",
         "in": "header",
         "name": "ProjectKey"
       },
