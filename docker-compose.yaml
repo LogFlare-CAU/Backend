@@ -20,7 +20,6 @@ services:
     expose:
       - 80
     networks:
-      - cloudflare-tunnel
       - logflare
       - edge
 
@@ -31,7 +30,3 @@ networks:
   logflare:
     external:
       true
-  cloudflare-tunnel:
-    external:
-      true
-    name: cloudflare-tunnel
