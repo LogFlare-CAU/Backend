@@ -19,13 +19,15 @@ services:
       - main.py
     expose:
       - 80
-    ports:
-      - "8256:80"
     networks:
       - cloudflare-tunnel
       - logflare
+      - edge
 
 networks:
+  edge:
+    external: true
+    name: edge
   logflare:
     external:
       true
