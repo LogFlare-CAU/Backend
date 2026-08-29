@@ -153,6 +153,12 @@
             font-weight: normal;
         }
         .badges img {
+            /* display 를 명시한다. 이전에는 <img> 의 기본값 inline 에 기대고
+               아무것도 쓰지 않았는데, kit 이 들여오는 Tailwind Preflight 에
+               `img,svg,video{display:block}` 이 있어 배지가 한 줄에 하나씩
+               세로로 쌓였다. 배지는 가로로 흐르다 줄바꿈되어야 한다. */
+            display: inline-block;
+            vertical-align: middle;
             margin: 4px;
             height: 28px; /* Badge height alignment */
         }
