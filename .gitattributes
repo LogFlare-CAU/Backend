@@ -1,0 +1,28 @@
+# Normalize text files in repo to LF, keep Windows scripts as CRLF.
+* text=auto eol=lf
+
+# Windows-specific scripts
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Common binaries
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.svg text
+*.pdf binary
+*.zip binary
+*.gz binary
+*.7z binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.mp4 binary
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
