@@ -4,23 +4,61 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LOGFLARE - Mobile Log Notification</title>
+    <!-- kit 공용 디자인 시스템. 아래 <style> 보다 먼저 로드해야 이 페이지의
+         레이어 밖 규칙이 kit 을 이긴다(kit AGENTS.md §0). accent 는 blue hue 240
+         (kit 스펙 §5.2) — 이 페이지가 쓰던 var(--accent) 와 같은 계열이다.
+         --color-accent 가 아니라 --kit-accent 로 주입한다(kit AGENTS.md §6.1). -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://kit.code0987.me/v1/app.css">
+    <style>:root{--kit-accent:oklch(0.780 0.135 240)}</style>
     <style>
         /* ===========================
-           Global Styles (Dark Theme)
+           kit 토큰 리다이렉트
+           ===========================
+           이 페이지는 별도 CSS 파일 없이 이 <style> 하나가 전부라, 색을 전부
+           하드코딩 hex 로 갖고 있었다. 이름을 만들어 kit 을 가리키게 하고
+           아래 규칙들은 그 이름만 쓴다 — kit 팔레트가 바뀌면 함께 따라온다.
+
+           눈에 띄는 변화: 배경이 #1e1e2f(oklch L 0.243)에서 kit 의 L 0.145 로
+           더 어두워진다. accent 는 var(--accent)(oklch 0.701 0.160 253)에서 kit 의
+           blue(0.780 0.135 240)로 조금 밝고 덜 진해진다 — 같은 계열이다.
            =========================== */
-        body {
-            margin: 0;
-            font-family: "Segoe UI", "Apple SD Gothic Neo", sans-serif;
-            background-color: #1e1e2f; /* Dark Navy Background */
-            color: #e0e0e0;            /* Light Gray Text */
-            text-align: center;
-            padding: 40px 20px;
-            line-height: 1.6;
+        :root {
+            --bg: var(--color-bg);
+            --surface: var(--color-surface);
+            --surface-2: var(--color-surface-2);
+            --border: var(--color-border);
+            --ink: var(--color-text);
+            --mute: var(--color-muted);
+            --dim: var(--color-dim);
+            --accent: var(--color-accent);
+            --on-accent: var(--color-on-accent);
+            /* hover 파생은 다른 서비스와 같은 식을 쓴다. */
+            --accent-hover: color-mix(in oklab, var(--color-accent) 82%, black);
+            --accent-glow: color-mix(in oklab, var(--color-accent) 40%, transparent);
         }
 
-        a {
-            text-decoration: none;
-            color: inherit;
+        /* kit 마이그레이션 1단계 — 전역 리셋만 @layer base 로 감싼다.
+           kit 번들은 Tailwind v4 라 모든 규칙이 @layer 안에 있고, 레이어 없는
+           선언은 명시도와 무관하게 레이어 안의 모든 선언을 이긴다. 감싸는
+           대상은 리셋뿐이다 — 아래 .section/.repo-card 같은 이 페이지 고유
+           규칙까지 감싸면 이번엔 kit 이 그것들을 이긴다(우선순위 역전). */
+        @layer base {
+            body {
+                margin: 0;
+                font-family: "Segoe UI", "Apple SD Gothic Neo", sans-serif;
+                background-color: var(--bg);
+                color: var(--ink);
+                text-align: center;
+                padding: 40px 20px;
+                line-height: 1.6;
+            }
+
+            a {
+                text-decoration: none;
+                color: inherit;
+            }
         }
 
         /* ===========================
@@ -32,19 +70,19 @@
         h1 {
             font-size: 3.5em;
             margin: 0.1em 0;
-            color: #4ea1ff; /* Point Blue */
+            color: var(--accent); /* Point Blue */
             letter-spacing: -1px;
         }
         .subtitle {
             font-size: 1.2em;
-            color: #bbbbbb;
+            color: var(--mute);
             font-weight: 300;
             margin-bottom: 20px;
         }
         .description {
             max-width: 600px;
             margin: 0 auto;
-            color: #ccc;
+            color: var(--mute);
         }
 
         /* ===========================
@@ -54,19 +92,19 @@
             max-width: 800px;
             margin: 30px auto;
             text-align: left;
-            background: #2a2a3d; /* Card Background */
+            background: var(--surface);
             padding: 30px;
             border-radius: 12px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-            border-left: 5px solid #4ea1ff; /* Left Accent Line */
+            border-left: 5px solid var(--accent); /* Left Accent Line */
         }
 
         .section h3 {
             margin-top: 0;
             margin-bottom: 20px;
-            color: #fff;
+            color: var(--ink);
             font-size: 1.4em;
-            border-bottom: 1px solid #444;
+            border-bottom: 1px solid var(--border);
             padding-bottom: 10px;
         }
 
@@ -79,27 +117,27 @@
             gap: 15px;
         }
         .repo-card {
-            background: #1e1e2f;
+            background: var(--bg);
             padding: 15px 20px;
             border-radius: 8px;
-            border: 1px solid #444;
+            border: 1px solid var(--border);
             transition: all 0.2s ease;
             display: block; /* For <a> tag */
         }
         .repo-card:hover {
-            border-color: #4ea1ff;
+            border-color: var(--accent);
             transform: translateX(5px);
-            background: #252538;
+            background: var(--surface-2);
         }
         .repo-title {
             font-weight: bold;
-            color: #4ea1ff;
+            color: var(--accent);
             font-size: 1.1em;
             margin-right: 8px;
         }
         .repo-desc {
             font-size: 0.9em;
-            color: #bbb;
+            color: var(--mute);
         }
 
         /* ===========================
@@ -111,7 +149,7 @@
         .badge-group h4 {
             margin: 5px 0 10px 0;
             font-size: 1em;
-            color: #888;
+            color: var(--dim);
             font-weight: normal;
         }
         .badges img {
@@ -133,13 +171,13 @@
         }
         ul li::before {
             content: "•";
-            color: #4ea1ff;
+            color: var(--accent);
             font-weight: bold;
             position: absolute;
             left: 0;
         }
         .bold-text {
-            color: #fff;
+            color: var(--ink);
             font-weight: bold;
         }
 
@@ -155,24 +193,24 @@
         .team-table th, .team-table td {
             text-align: left;
             padding: 12px;
-            border-bottom: 1px solid #444;
+            border-bottom: 1px solid var(--border);
         }
         .team-table th {
-            color: #4ea1ff;
+            color: var(--accent);
             font-weight: 600;
-            border-bottom: 2px solid #4ea1ff;
+            border-bottom: 2px solid var(--accent);
         }
         .team-table td:first-child {
             font-weight: bold;
-            color: #fff;
+            color: var(--ink);
             white-space: nowrap;
         }
         /* Mobile Responsive for Table */
         @media (max-width: 600px) {
             .team-table thead { display: none; }
-            .team-table tr { display: block; margin-bottom: 20px; border: 1px solid #444; padding: 10px; border-radius: 8px; }
+            .team-table tr { display: block; margin-bottom: 20px; border: 1px solid var(--border); padding: 10px; border-radius: 8px; }
             .team-table td { display: block; border: none; padding: 5px 0; }
-            .team-table td:first-child { color: #4ea1ff; font-size: 1.1em; margin-bottom: 5px; }
+            .team-table td:first-child { color: var(--accent); font-size: 1.1em; margin-bottom: 5px; }
         }
 
         /* ===========================
@@ -180,8 +218,8 @@
            =========================== */
         .cta-button {
             display: inline-block;
-            background-color: #4ea1ff;
-            color: #1e1e2f;
+            background-color: var(--accent);
+            color: var(--on-accent);
             padding: 12px 30px;
             border-radius: 6px;
             font-weight: bold;
@@ -190,16 +228,16 @@
             transition: background-color 0.2s, transform 0.2s;
         }
         .cta-button:hover {
-            background-color: #3b8ce0;
+            background-color: var(--accent-hover);
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(78, 161, 255, 0.4);
+            box-shadow: 0 4px 12px var(--accent-glow);
         }
 
         /* Footer */
         .footer {
             margin-top: 60px;
             font-size: 0.9em;
-            color: #666;
+            color: var(--dim);
         }
     </style>
 </head>
@@ -268,7 +306,7 @@
 <div class="section">
     <h3>📌 Project Overview</h3>
     <div style="margin-bottom: 25px;">
-        <h4 style="color:#bbb; margin:0 0 10px 0;">Project Motivation</h4>
+        <h4 style="color:var(--mute); margin:0 0 10px 0;">Project Motivation</h4>
         <ul>
             <li><span class="bold-text">복잡한 서버 설정:</span> 개인 개발자나 소규모 팀에게는 로그 관리 서버 구축이 큰 진입 장벽입니다.</li>
             <li><span class="bold-text">웹 기반의 한계:</span> 기존 도구는 주로 웹 기반이라 모바일에서의 즉각적인 대응이 어렵습니다.</li>
@@ -277,7 +315,7 @@
     </div>
 
     <div>
-        <h4 style="color:#bbb; margin:0 0 10px 0;">✨ Key Functions</h4>
+        <h4 style="color:var(--mute); margin:0 0 10px 0;">✨ Key Functions</h4>
         <ul>
             <li><span class="bold-text">실시간 로그 수집:</span> 개발 환경의 로그를 즉시 수집</li>
             <li><span class="bold-text">스마트 알림:</span> 에러 발생 시 설정한 로그 레벨에 따라 푸시 알림 발송</li>
@@ -288,7 +326,7 @@
 
 <div class="section">
     <h3>🏗 System Architecture</h3>
-    <ol style="color:#ccc; padding-left: 20px; line-height: 1.8;">
+    <ol style="color:var(--mute); padding-left: 20px; line-height: 1.8;">
         <li><strong>Developer Local Environment:</strong> 커스텀 로거를 통해 로그를 전송</li>
         <li><strong>LogFlare Server:</strong> 수신된 로그 저장 및 Firebase 알림 트리거</li>
         <li><strong>Firebase (FCM):</strong> 안드로이드 앱으로 알림 전달</li>
