@@ -60,7 +60,7 @@ ruff check app tests scripts
 * Rotate project key: `POST /project/{id}/rotate-token` (moderator)
 * Logfile paths must be under `LOGFLARE_LOG_ROOTS` (comma-separated)
 * Interactive docs are off on the live app (`docs_url=None`). Published schema:
-  [Swagger viewer](https://macqueen0987.github.io/swagger-viewer/?spec=https://raw.githubusercontent.com/LogFlare-CAU/Backend/openapi-jsons/openapi.json)
+  [Swagger viewer](https://errcode0987.github.io/swagger-viewer/?spec=https://raw.githubusercontent.com/LogFlare-CAU/Backend/openapi-jsons/openapi.json)
 
 ## CLI
 
