@@ -196,3 +196,63 @@ async def test_purge_old_keeps_groups():
         await s.commit()
     assert await _count(Errorlog) == 0
     assert await _count(ErrorGroup) == 1
+
+
+def _ev(action, age, **attrs):
+    return json.dumps(
+        {"Action": action, "time": int(NOW.timestamp()) - age, "Actor": {"Attributes": {"name": "web", **attrs}}}
+    ).encode() + b"\n"
+
+
+async def test_old_events_recorded_but_not_pushed(monkeypatch):
+    calls = []
+
+    async def fake(project_id, container, event, at, detail):
+        calls.append(at)
+        return True
+
+    monkeypatch.setattr(collector, "notify_container_event", fake)
+    events = _ev("die", 7200, exitCode="1") + _ev("die", 5, exitCode="137")
+    await collect_once(make_docker({}, events=events), NOW)
+    assert len(collector.container_events) == 2
+    assert len(calls) == 1
+
+
+async def test_container_failure_isolated(monkeypatch):
+    calls = []
+
+    async def fake(*a):
+        calls.append(a)
+        return True
+
+    monkeypatch.setattr(collector, "notify_container_event", fake)
+
+    def handler(req):
+        p = req.url.path
+        if p == "/containers/json":
+            return httpx.Response(200, json=[{"Id": "ia", "Names": ["/a"]}, {"Id": "ib", "Names": ["/b"]}])
+        if p == "/events":
+            return httpx.Response(200, content=_ev("die", 5, exitCode="1"))
+        if p.startswith("/containers/ia"):
+            return httpx.Response(404)
+        if p.endswith("/json"):
+            return httpx.Response(200, json={"Config": {"Tty": False}})
+        return httpx.Response(200, content=logbody(["ERROR boom"]))
+
+    d = DockerClient("http://docker", transport=httpx.MockTransport(handler))
+    with pytest.raises(RuntimeError, match="a"):
+        await collect_once(d, NOW)
+    assert await _count(Errorlog) == 1
+    assert len(calls) == 1
+
+
+async def test_notify_failure_still_advances_events_cursor(monkeypatch):
+    async def boom(*a):
+        raise RuntimeError("push down")
+
+    monkeypatch.setattr(collector, "notify_container_event", boom)
+    await collect_once(make_docker({}, events=_ev("die", 5, exitCode="1")), NOW)
+    async with async_session() as s:
+        cur = await s.get(collector.CollectorCursor, "__events__")
+    assert cur.last_ts == NOW.replace(tzinfo=None)
+    assert len(collector.container_events) == 1

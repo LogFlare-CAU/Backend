@@ -18,6 +18,7 @@ logger = get_logger()
 
 EXCLUDED = {"aitg-discordbot", "logflare", "logflare-docker-proxy"}
 EVENTS_CURSOR = "__events__"
+NOTIFY_WINDOW = timedelta(seconds=60)  # 이보다 오래된 이벤트는 요약에만 쌓고 푸시하지 않는다
 
 collector_state: dict = {"ok": False, "last_at": None, "error": None}
 container_events: list[dict] = []
@@ -100,7 +101,13 @@ async def _collect_events(docker: DockerClient, now: datetime) -> None:
                 detail = "out of memory"
             at = datetime.fromtimestamp(ev.get("time", now.timestamp()), UTC)
             container_events.append({"container": name, "event": kind, "at": at})
-            await notify_container_event(await _project_id(conn, name), name, kind, at, detail)
+            if at >= now - NOTIFY_WINDOW:
+                try:
+                    await notify_container_event(
+                        await _project_id(conn, name), name, kind, at, detail
+                    )
+                except Exception:
+                    logger.exception("notify_container_event failed for %s", name)
         cutoff = now - timedelta(hours=24)
         container_events[:] = [e for e in container_events if e["at"] >= cutoff]
         cur.last_ts = _naive(now)
@@ -108,15 +115,24 @@ async def _collect_events(docker: DockerClient, now: datetime) -> None:
 
 
 async def collect_once(docker: DockerClient, now: datetime) -> None:
+    failed = []
     for c in await docker.list_containers():
         if c["name"] in EXCLUDED:
             continue
-        for error_id, pid in await _collect_logs(docker, now, c):
+        try:
+            new = await _collect_logs(docker, now, c)
+        except Exception:
+            logger.exception("collect failed for %s", c["name"])
+            failed.append(c["name"])
+            continue
+        for error_id, pid in new:
             try:
                 await notify_error(error_id, pid, True)
             except Exception:
                 logger.exception("notify_error failed")
     await _collect_events(docker, now)
+    if failed:
+        raise RuntimeError(f"collect failed: {', '.join(failed)}")
 
 
 async def purge_old(conn, cutoff: datetime) -> None:
