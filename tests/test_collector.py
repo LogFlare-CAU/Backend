@@ -52,8 +52,7 @@ def make_docker(containers, logs=None, events=b"", requests=None, status=200):
             return httpx.Response(200, json=[{"Id": i, "Names": [f"/{n}"]} for n, i in containers.items()])
         if p == "/events":
             return httpx.Response(200, content=events)
-        if p.endswith("/json"):
-            return httpx.Response(200, json={"Config": {"Tty": False}})
+        assert not (p.startswith("/containers/") and p.endswith("/json")), "inspect 호출 금지"
         if p.endswith("/logs"):
             return httpx.Response(200, content=logs.get(by_id[p.split("/")[2]], b""))
         return httpx.Response(404)
@@ -235,8 +234,6 @@ async def test_container_failure_isolated(monkeypatch):
             return httpx.Response(200, content=_ev("die", 5, exitCode="1"))
         if p.startswith("/containers/ia"):
             return httpx.Response(404)
-        if p.endswith("/json"):
-            return httpx.Response(200, json={"Config": {"Tty": False}})
         return httpx.Response(200, content=logbody(["ERROR boom"]))
 
     d = DockerClient("http://docker", transport=httpx.MockTransport(handler))
@@ -256,3 +253,46 @@ async def test_notify_failure_still_advances_events_cursor(monkeypatch):
         cur = await s.get(collector.CollectorCursor, "__events__")
     assert cur.last_ts == NOW.replace(tzinfo=None)
     assert len(collector.container_events) == 1
+
+
+async def test_logs_raw_tty_and_crlf():
+    d = make_docker({"a": "id1"}, {"a": b"2026-10-18T01:02:03Z hi\r\n2026-10-18T01:02:04Z yo\n"})
+    lines = await d.logs("id1", 0)
+    assert [m for _, m in lines] == ["hi", "yo"]
+
+
+async def _pushes(monkeypatch, body):
+    calls = []
+
+    async def fake(*a, **k):
+        calls.append(a)
+
+    monkeypatch.setattr(collector, "notify_error", fake)
+    await collect_once(make_docker({"x": "i1"}, {"x": body}), NOW)
+    return calls
+
+
+async def test_backfill_new_group_not_pushed(monkeypatch):
+    assert await _pushes(monkeypatch, logbody(["ERROR boom"], start=NOW - timedelta(hours=1))) == []
+    assert await _count(ErrorGroup) == 1
+
+
+async def test_fresh_new_group_pushed(monkeypatch):
+    assert len(await _pushes(monkeypatch, logbody(["ERROR boom"], start=NOW - timedelta(seconds=5)))) == 1
+
+
+async def test_restart_recorded_not_pushed(monkeypatch):
+    calls = []
+
+    async def fake(*a):
+        calls.append(a)
+        return True
+
+    monkeypatch.setattr(collector, "notify_container_event", fake)
+    reqs = []
+    d = make_docker({}, events=_ev("restart", 5), requests=reqs)
+    await collect_once(d, NOW)
+    assert calls == []
+    assert [e["event"] for e in collector.container_events] == ["restart"]
+    ev_req = next(r for r in reqs if r.url.path == "/events")
+    assert "restart" in ev_req.url.params["filters"]

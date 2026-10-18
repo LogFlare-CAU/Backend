@@ -1,5 +1,4 @@
-"""GET /summary tests."""
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -75,3 +74,15 @@ async def test_summary_timestamps_are_utc_aware(client, token_file):
     d = (await client.get("/summary", headers=_h("secret"))).json()["data"]
     for v in (d["topGroups"][0]["lastSeen"], d["containerEvents24h"][0]["at"], d["lastCollectedAt"]):
         assert v.endswith("+00:00"), v
+
+
+@pytest.mark.asyncio
+async def test_summary_events_newest_first(client, token_file):
+    token_file.write_text("secret")
+    now = datetime.now(UTC)
+    collector.container_events.extend([
+        {"container": "old", "event": "die", "at": now - timedelta(hours=2)},
+        {"container": "new", "event": "die", "at": now},
+    ])
+    d = (await client.get("/summary", headers=_h("secret"))).json()["data"]
+    assert [e["container"] for e in d["containerEvents24h"]] == ["new", "old"]

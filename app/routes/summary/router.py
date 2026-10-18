@@ -74,7 +74,7 @@ async def summary(request: Request, conn=get_db):
             ],
             "containerEvents24h": [
                 {"container": e["container"], "event": e["event"], "at": _iso(e["at"])}
-                for e in collector.container_events
+                for e in reversed(collector.container_events)
             ],
             "collectorOk": ok,
             "lastCollectedAt": _iso(last_at) if last_at else None,

@@ -72,7 +72,8 @@ async def _collect_logs(docker: DockerClient, now: datetime, c: dict) -> list[tu
         new = []
         for e in entries:
             log, _group, is_new = await record_entry(conn, pid, name, e)
-            if is_new:
+            # 첫 attach 의 24h 백필은 요약에만 쌓고 푸시하지 않는다.
+            if is_new and _naive(e.ts) >= _naive(now) - NOTIFY_WINDOW:
                 new.append((log.id, pid))
         cur.last_ts = max(cur.last_ts, max(_naive(ts) for ts, _ in lines))
         await conn.commit()
@@ -97,11 +98,13 @@ async def _collect_events(docker: DockerClient, now: datetime) -> None:
                 if not kind.endswith("unhealthy"):
                     continue
                 kind, detail = "unhealthy", "health check failed"
+            elif kind == "restart":
+                detail = "restarted"
             else:
                 detail = "out of memory"
             at = datetime.fromtimestamp(ev.get("time", now.timestamp()), UTC)
             container_events.append({"container": name, "event": kind, "at": at})
-            if at >= now - NOTIFY_WINDOW:
+            if kind != "restart" and at >= now - NOTIFY_WINDOW:
                 try:
                     await notify_container_event(
                         await _project_id(conn, name), name, kind, at, detail

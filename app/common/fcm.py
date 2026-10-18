@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import Coroutine
 from typing import Any, Callable
 
@@ -44,7 +45,7 @@ async def send_fcm_message(
     )
 
     try:
-        response = messaging.send(message)
+        response = await asyncio.to_thread(messaging.send, message)
         return response
 
     except FCMUnregisteredError:

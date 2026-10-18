@@ -83,3 +83,24 @@ async def test_container_event_cooldown(client, project_with_key, sent):
     assert await n("die", t0 + timedelta(minutes=11)) is True
     assert await n("oom", t0) is True
     assert len(sent) == 3
+
+
+@pytest.mark.asyncio
+async def test_long_message_truncated_in_push(client, project_with_key, sent):
+    name, token, _ = project_with_key
+    await _ingest(client, name, token, "x" * 10000)
+    assert len(sent) == 1
+    body, data = sent[0][2], sent[0][3]
+    assert len(data["message"]) <= 1000 and len(body) < 1200
+
+
+@pytest.mark.asyncio
+async def test_container_event_timestamp_naive(sent):
+    at = datetime(2026, 10, 18, 12, 0, 0, tzinfo=UTC)
+    async with async_session() as s:
+        from routes.projects.model import Project
+        s.add(Project(name="web", token=None))
+        await s.commit()
+        pid = (await s.execute(select(Project.id).where(Project.name == "web"))).scalar_one()
+    await tasks.notify_container_event(pid, "web", "die", at, "exit code 1")
+    assert sent[0][3]["timestamp"] == "2026-10-18T12:00:00"

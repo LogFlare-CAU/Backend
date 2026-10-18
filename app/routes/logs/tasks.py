@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from functools import partial
 
 from sqlalchemy import select
@@ -13,6 +13,8 @@ from routes.projects import service as project_service
 from . import model
 
 logger = get_logger()
+
+_MAX_MSG = 1000  # FCM data 는 4096 바이트 제한 — 트레이스백 전체를 싣지 않는다
 
 
 async def _send_to_recipients(conn, projectid: int, title: str, msg: str, data: dict):
@@ -51,8 +53,9 @@ async def notify_error(error_id: int, projectid: int, is_new: bool, test: bool =
             if group is not None and group.ignored:
                 return
             project = await project_service.get_project(conn, projectid, True)
+            text = error.message[:_MAX_MSG]
             msg = (
-                f"Error ID: {error.id}\nMessage: {error.message}\n"
+                f"Error ID: {error.id}\nMessage: {text}\n"
                 f"Time: {error.timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
             )
             data = {
@@ -60,7 +63,7 @@ async def notify_error(error_id: int, projectid: int, is_new: bool, test: bool =
                 "type": error.errortype or "Unknown",
                 "level": error.level,
                 "timestamp": error.timestamp.isoformat(),
-                "message": error.message,
+                "message": text,
                 "projectid": str(projectid),
                 "test": "true" if test else "false",
             }
@@ -93,7 +96,7 @@ async def notify_container_event(
         "errorid": "0",
         "type": f"container.{event}",
         "level": "CRITICAL",
-        "timestamp": at.isoformat(),
+        "timestamp": (at.astimezone(UTC).replace(tzinfo=None) if at.tzinfo else at).isoformat(),
         "message": message,
         "projectid": str(project_id),
         "test": "false",
