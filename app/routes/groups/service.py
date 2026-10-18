@@ -1,3 +1,5 @@
+from datetime import UTC
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,13 +14,15 @@ async def record_entry(
 ) -> tuple[Errorlog, ErrorGroup, bool]:
     """Errorlog 를 넣고 묶음을 만들거나 갱신한다. commit 은 호출자가 한다."""
     message = mask_secrets(entry.message)
+    # SQLite 는 tzinfo 를 버리므로 naive UTC 로 통일해 저장·비교한다.
+    ts = entry.ts.astimezone(UTC).replace(tzinfo=None) if entry.ts.tzinfo else entry.ts
     fp = fingerprint(source, entry.level, message)
     log = Errorlog(
         project_id=project_id,
         errortype=entry.errortype,
         message=message,
         level=entry.level,
-        timestamp=entry.ts,
+        timestamp=ts,
         fingerprint=fp,
     )
     conn.add(log)
@@ -33,13 +37,13 @@ async def record_entry(
             level=entry.level,
             errortype=entry.errortype,
             sample=message,
-            first_seen=entry.ts,
-            last_seen=entry.ts,
+            first_seen=ts,
+            last_seen=ts,
             count=1,
         )
         conn.add(group)
     else:
         group.count += 1
-        group.last_seen = max(group.last_seen, entry.ts)
+        group.last_seen = max(group.last_seen, ts)
     await conn.flush()
     return log, group, is_new

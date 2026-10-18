@@ -57,3 +57,25 @@ async def test_post_log_error_still_204_and_listed(client, admin_token, project_
     assert {"id", "project_id", "errortype", "message", "level", "timestamp", "fingerprint"} <= keys
     async with async_session() as s:
         assert len((await s.execute(select(ErrorGroup))).scalars().all()) == 1
+
+
+@pytest.mark.asyncio
+async def test_ingest_same_message_twice_over_http(client, project_with_key):
+    name, token, _ = project_with_key
+    await _ingest(client, name, token, "boom")
+    await _ingest(client, name, token, "boom")
+    async with async_session() as s:
+        groups = (await s.execute(select(ErrorGroup))).scalars().all()
+        assert len(groups) == 1 and groups[0].count == 2
+
+
+@pytest.mark.asyncio
+async def test_record_entry_reloaded_group_with_aware_ts():
+    async with async_session() as s:
+        pid = await _project(s)
+        await record_entry(s, pid, "p1", _entry("boom"))
+        await s.commit()
+    async with async_session() as s:
+        _, g, new = await record_entry(s, pid, "p1", _entry("boom"))
+        await s.commit()
+        assert not new and g.count == 2
