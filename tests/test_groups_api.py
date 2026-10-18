@@ -61,3 +61,14 @@ async def test_group_detail_recent_20(client, admin_token):
     ts = [r["timestamp"] for r in data["recent"]]
     assert ts == sorted(ts, reverse=True)
     assert (await client.get("/group/9999", headers=h)).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_group_timestamps_are_utc_aware(client, admin_token):
+    await seed([2], "t")
+    h = _h(admin_token)
+    item = (await client.get("/group", headers=h)).json()["data"][0]
+    assert item["first_seen"].endswith("+00:00") and item["last_seen"].endswith("+00:00")
+    d = (await client.get(f"/group/{item['id']}", headers=h)).json()["data"]
+    assert d["first_seen"].endswith("+00:00")
+    assert all(r["timestamp"].endswith("+00:00") for r in d["recent"])

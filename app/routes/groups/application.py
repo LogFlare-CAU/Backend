@@ -2,6 +2,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from common.timeutil import utc_dict
 from routes.logs.model import Errorlog
 from routes.projects.model import Project
 
@@ -9,7 +10,7 @@ from .model import ErrorGroup
 
 
 def _row(group: ErrorGroup, project_name: str) -> dict:
-    return {**dict(group), "project_name": project_name}
+    return {**utc_dict(group), "project_name": project_name}
 
 
 async def list_groups(
@@ -48,7 +49,7 @@ async def get_group(conn: AsyncSession, group_id: int) -> dict:
             .limit(20)
         )
     ).scalars().all()
-    return {**_row(group, name), "recent": [dict(r) for r in recent]}
+    return {**_row(group, name), "recent": [utc_dict(r) for r in recent]}
 
 
 async def set_ignored(conn: AsyncSession, group_id: int, ignored: bool) -> dict:

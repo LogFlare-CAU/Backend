@@ -62,3 +62,16 @@ async def test_summary_collector_down(client, token_file):
     r = await client.get("/summary", headers=_h("secret"))
     assert r.status_code == 200
     assert r.json()["data"]["collectorOk"] is False
+
+
+@pytest.mark.asyncio
+async def test_summary_timestamps_are_utc_aware(client, token_file):
+    token_file.write_text("secret")
+    await seed([2], "u")
+    collector.container_events.append(
+        {"container": "web", "event": "die", "at": datetime.now(UTC)}
+    )
+    collector.collector_state.update(ok=True, last_at=datetime.now(UTC))
+    d = (await client.get("/summary", headers=_h("secret"))).json()["data"]
+    for v in (d["topGroups"][0]["lastSeen"], d["containerEvents24h"][0]["at"], d["lastCollectedAt"]):
+        assert v.endswith("+00:00"), v

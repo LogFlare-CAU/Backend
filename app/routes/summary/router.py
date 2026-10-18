@@ -1,4 +1,5 @@
 import hmac
+from pathlib import Path
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, HTTPException, Request
@@ -6,6 +7,7 @@ from sqlalchemy import func, select
 
 from common.env_utils import getenvval
 from common.schema import APIResponse
+from common.timeutil import utc_iso as _iso
 from common.sqlsession import get_db
 from routes.collector import collector
 from routes.groups.model import ErrorGroup
@@ -18,7 +20,7 @@ router = APIRouter(tags=["summary"])
 def _check_token(request: Request) -> None:
     path = getenvval("LOGFLARE_READ_TOKEN_FILE", "")
     try:
-        expected = open(path, encoding="utf-8").read().strip() if path else ""
+        expected = Path(path).read_text(encoding="utf-8").strip() if path else ""
     except OSError:
         expected = ""
     scheme, _, given = request.headers.get("Authorization", "").partition(" ")
@@ -27,10 +29,6 @@ def _check_token(request: Request) -> None:
         given.encode(), expected.encode()
     ):
         raise HTTPException(401, "Invalid token", headers={"WWW-Authenticate": "Bearer"})
-
-
-def _iso(dt: datetime) -> str:
-    return dt.isoformat()
 
 
 @router.get("/summary", summary="home 대시보드용 요약", response_model=APIResponse)
