@@ -61,7 +61,7 @@ h1 { font-size:1.25rem; margin:0 0 12px }
   const $ = id => document.getElementById(id);
   const base = location.pathname.replace(/[^/]*$/, '');
   const PAGE = 50;
-  let sort = 'new', offset = 0;
+  let sort = 'new', offset = 0, seq = 0;
 
   const store = {
     get() { try { return sessionStorage.getItem('lf_jwt') } catch { return null } },
@@ -80,7 +80,7 @@ h1 { font-size:1.25rem; margin:0 0 12px }
     return j.data;
   }
 
-  function showLogin() { store.set(null); $('app').hidden = true; $('login').hidden = false; }
+  function showLogin() { store.set(null); seq++; $('list').replaceChildren(); $('proj').length = 1; $('more').hidden = true; $('app').hidden = true; $('login').hidden = false; }
   function showApp() { $('login').hidden = true; $('app').hidden = false; }
   async function guard(fn) {
     try { await fn(); $('msg').textContent = ''; }
@@ -89,6 +89,7 @@ h1 { font-size:1.25rem; margin:0 0 12px }
 
   function rel(iso) {
     const s = Math.max(0, (Date.now() - new Date(iso)) / 1000);
+    if (Number.isNaN(s)) return '-';
     if (s < 60) return '방금';
     if (s < 3600) return Math.floor(s / 60) + '분 전';
     if (s < 86400) return Math.floor(s / 3600) + '시간 전';
@@ -99,6 +100,8 @@ h1 { font-size:1.25rem; margin:0 0 12px }
 
   function row(g) {
     const d = el('div', 'g' + (g.ignored ? ' ign' : ''));
+    d.tabIndex = 0; d.setAttribute('role', 'button');
+    d.onkeydown = e => { if (e.key === 'Enter' && e.target === d) d.onclick(); };
     const top = el('div', 'g-top');
     top.append(el('span', null, g.project_name), el('span', 'badge badge-warn', g.level),
       el('span', null, rel(g.last_seen)), el('span', 'cnt', g.count + '회'));
@@ -128,10 +131,13 @@ h1 { font-size:1.25rem; margin:0 0 12px }
   }
 
   async function load(reset) {
-    if (reset) { offset = 0; $('list').replaceChildren(); }
+    const my = ++seq;
+    if (reset) offset = 0;
     const q = new URLSearchParams({ sort, limit: PAGE, offset, include_ignored: $('ign').checked });
     if ($('proj').value) q.set('project_id', $('proj').value);
     const items = await api('group?' + q);
+    if (my !== seq) return;
+    if (reset) $('list').replaceChildren();
     for (const g of items) $('list').append(row(g));
     offset += items.length;
     $('more').hidden = items.length < PAGE;
@@ -142,6 +148,7 @@ h1 { font-size:1.25rem; margin:0 0 12px }
     showApp();
     await guard(async () => {
       const ps = await api('project/');
+      $('proj').length = 1;
       for (const p of ps) { const o = el('option', null, p.name); o.value = p.id; $('proj').append(o); }
       await load(true);
     });
