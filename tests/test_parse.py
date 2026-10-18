@@ -47,3 +47,39 @@ def test_traceback_is_one_entry():
     assert e.level == "ERROR" and e.errortype == "TossAPIError"
     assert "raise last_error" in e.message
     assert normalize(e.message).startswith("src.toss.errors.TossAPIError")
+
+
+def test_mask_prefixed_and_json_keys():
+    for src, leak in [
+        ("access_token=abc1", "abc1"), ("client_secret=zz", "zz"), ("refresh_token=rt9", "rt9"),
+        ("SECRET_KEY=abcq", "abcq"), ('{"password": "hunter2"}', "hunter2"), ("{'api_key':'k77'}", "k77"),
+    ]:
+        out = mask_secrets(src)
+        assert leak not in out and "***" in out, src
+
+
+def _run(lines):
+    asm = LineAssembler()
+    out = []
+    for ln in lines:
+        out += asm.feed(T, ln)
+    return out + asm.flush()
+
+
+def test_traceback_nonstandard_exception_names():
+    for exc, et in [("psycopg2.errors.UniqueViolation: dup key", "UniqueViolation"), ("socket.timeout: timed out", "timeout")]:
+        out = _run(["Traceback (most recent call last):", '  File "x.py", line 1, in f', "    boom()", exc, "INFO next"])
+        assert len(out) == 1 and out[0].errortype == et and exc in out[0].message
+        assert normalize(out[0].message).startswith(exc.split(":")[0])
+
+
+def test_chained_exception_is_one_entry():
+    out = _run([
+        "Traceback (most recent call last):", '  File "x.py", line 1, in f', "    a()", "ValueError: bad",
+        "", "During handling of the above exception, another exception occurred:", "",
+        "Traceback (most recent call last):", '  File "x.py", line 5, in g', "    b()", "RuntimeError: wrapped",
+        "INFO next",
+    ])
+    assert len(out) == 1 and out[0].errortype == "RuntimeError"
+    assert "ValueError: bad" in out[0].message
+    assert normalize(out[0].message).startswith("RuntimeError")

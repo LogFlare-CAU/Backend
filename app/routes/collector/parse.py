@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 
-_SECRET_KV = re.compile(r"(?i)\b(token|key|password|passwd|pwd|secret|api[_-]?key)\b(\s*[=:]\s*)([^\s&\"']+)")
+_SECRET_KV = re.compile(r"(?i)([\w-]*(?:token|key|password|passwd|pwd|secret)\w*[\"']?\s*[=:]\s*[\"']?)([^\s&\"',}]+)")
 _BEARER = re.compile(r"(?i)\b(Bearer\s+)\S+")
 _URL_USER = re.compile(r"(://)[^/\s:@]+:[^/\s@]+@")
 
@@ -12,7 +12,7 @@ _URL_USER = re.compile(r"(://)[^/\s:@]+:[^/\s@]+@")
 def mask_secrets(text: str) -> str:
     text = _URL_USER.sub(r"\1***@", text)
     text = _BEARER.sub(r"\1***", text)
-    return _SECRET_KV.sub(r"\1\2***", text)
+    return _SECRET_KV.sub(r"\1***", text)
 
 
 _NORMALIZERS = [
@@ -54,7 +54,8 @@ _JSON_LEVELS = {
 _ERR_RX = re.compile(r"\b(CRITICAL|FATAL|ERROR|Traceback|Exception|panic)\b", re.I)
 _WARN_RX = re.compile(r"\b(WARNING|WARN)\b", re.I)
 _ACCESS_RX = re.compile(r'HTTP/1\.[01]" \d{3}')
-_EXC_LINE = re.compile(r"^([\w.]*(?:Error|Exception|Exit|Interrupt))\b(?::|$)")
+_EXC_LINE = re.compile(r"^([\w.]+)(?::|$)")
+_CHAIN = ("During handling of the above exception", "The above exception was the direct cause")
 _TB_START = "Traceback (most recent call last):"
 
 
@@ -81,14 +82,17 @@ def classify(line: str) -> tuple[str, str | None] | None:
 
 
 class LineAssembler:
-    """줄을 하나씩 받아 Entry 로 묶는다. 트레이스백은 한 Entry."""
+    """줄을 하나씩 받아 Entry 로 묶는다. 트레이스백(체인 포함)은 한 Entry."""
 
     def __init__(self) -> None:
         self._buf: list[str] = []
         self._ts: datetime | None = None
+        self._done = False  # 예외 줄까지 읽음 — 체인이 이어지는지 다음 줄로 판단
 
     def _emit(self) -> list[Entry]:
-        buf, ts, self._buf, self._ts = self._buf, self._ts, [], None
+        buf, ts, self._buf, self._ts, self._done = self._buf, self._ts, [], None, False
+        while buf and not buf[-1].strip():
+            buf.pop()
         if not buf or ts is None:
             return []
         m = _EXC_LINE.match(buf[-1])
@@ -97,16 +101,25 @@ class LineAssembler:
 
     def feed(self, ts: datetime, line: str) -> list[Entry]:
         line = line.rstrip("\r\n")
+        out: list[Entry] = []
         if self._buf:
-            if not line.strip() or line[0] in " \t":
+            blank = not line.strip()
+            if self._done:
+                if blank:
+                    self._buf.append(line)
+                    return []
+                if line.startswith(_CHAIN):
+                    self._buf.append(line)
+                    self._done = False
+                    return []
+                out = self._emit()
+            elif blank or line[0] in " \t" or line.strip() == _TB_START:
                 self._buf.append(line)
                 return []
-            if _EXC_LINE.match(line):
+            else:  # 프레임 뒤 첫 비들여쓰기 줄 = 예외 줄
                 self._buf.append(line)
-                return self._emit()
-            out = self._emit()  # 예외 줄 없이 끊긴 트레이스백
-        else:
-            out = []
+                self._done = True
+                return []
         if line.strip() == _TB_START:
             self._buf, self._ts = [line], ts
             return out
