@@ -131,11 +131,15 @@ h1 { font-size:1.25rem; margin:0 0 12px }
   }
 
   async function load(reset) {
+    if (!reset && $('more').hidden) return;
     const my = ++seq;
+    $('more').hidden = true;
     if (reset) offset = 0;
     const q = new URLSearchParams({ sort, limit: PAGE, offset, include_ignored: $('ign').checked });
     if ($('proj').value) q.set('project_id', $('proj').value);
-    const items = await api('group?' + q);
+    let items;
+    try { items = await api('group?' + q); }
+    catch (e) { if (my === seq && !reset) $('more').hidden = false; throw e; }
     if (my !== seq) return;
     if (reset) $('list').replaceChildren();
     for (const g of items) $('list').append(row(g));
