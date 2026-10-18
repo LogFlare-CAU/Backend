@@ -1,7 +1,7 @@
 """Add errorlogs.logfile_id, errorlogs.raw, indexes; normalise level case
 
 Revision ID: b7c1d2e3f4a5
-Revises: a1b2c3d4e5f6
+Revises: b7c8d9e0f1a2
 Create Date: 2026-10-18 17:00:00.000000
 
 """
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "b7c1d2e3f4a5"
-down_revision: Union[str, Sequence[str], None] = "a1b2c3d4e5f6"
+down_revision: Union[str, Sequence[str], None] = "b7c8d9e0f1a2"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
