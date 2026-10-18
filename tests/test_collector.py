@@ -296,3 +296,21 @@ async def test_restart_recorded_not_pushed(monkeypatch):
     assert [e["event"] for e in collector.container_events] == ["restart"]
     ev_req = next(r for r in reqs if r.url.path == "/events")
     assert "restart" in ev_req.url.params["filters"]
+
+
+async def test_event_for_new_container_pushes_after_project_commit(monkeypatch):
+    from routes.fcm.model import FCMToken
+
+    sent = []
+
+    async def fake(*a, **k):
+        sent.append(a)
+
+    monkeypatch.setattr(tasks, "send_fcm_message", fake)
+    async with async_session() as s:
+        s.add(FCMToken(fcm_token="tok", user_idx=1))
+        await s.commit()
+    await collect_once(make_docker({}, events=_ev("die", 5, exitCode="3", name="brandnew")), NOW)
+    assert len(sent) == 1
+    async with async_session() as s:
+        assert (await s.execute(select(Project).where(Project.name == "brandnew"))).scalar_one()

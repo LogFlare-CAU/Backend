@@ -110,6 +110,5 @@ async def notify_container_event(
             await conn.commit()
         except Exception:
             await conn.rollback()
-            logger.exception("notify_container_event failed for %s", container)
             raise
     return True

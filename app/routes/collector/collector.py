@@ -81,6 +81,7 @@ async def _collect_logs(docker: DockerClient, now: datetime, c: dict) -> list[tu
 
 
 async def _collect_events(docker: DockerClient, now: datetime) -> None:
+    pending = []
     async with async_session() as conn:
         cur = await _cursor(conn, EVENTS_CURSOR, _naive(now) - timedelta(hours=24))
         events = await docker.events(_unix(cur.last_ts), now.timestamp())
@@ -105,16 +106,17 @@ async def _collect_events(docker: DockerClient, now: datetime) -> None:
             at = datetime.fromtimestamp(ev.get("time", now.timestamp()), UTC)
             container_events.append({"container": name, "event": kind, "at": at})
             if kind != "restart" and at >= now - NOTIFY_WINDOW:
-                try:
-                    await notify_container_event(
-                        await _project_id(conn, name), name, kind, at, detail
-                    )
-                except Exception:
-                    logger.exception("notify_container_event failed for %s", name)
+                pending.append((await _project_id(conn, name), name, kind, at, detail))
         cutoff = now - timedelta(hours=24)
         container_events[:] = [e for e in container_events if e["at"] >= cutoff]
         cur.last_ts = _naive(now)
         await conn.commit()
+    # 새 프로젝트가 commit 된 뒤에야 다른 세션에서 보인다.
+    for args in pending:
+        try:
+            await notify_container_event(*args)
+        except Exception:
+            logger.exception("notify_container_event failed for %s", args[1])
 
 
 async def collect_once(docker: DockerClient, now: datetime) -> None:
