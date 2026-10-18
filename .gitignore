@@ -13,6 +13,6 @@ logflare_env
 venv/
 *.pyc
 docker-compose.override.yaml
-tests/_test.sqlite
+tests/_test.sqlite*
 tests/fixtures/
 /clients/Python-Logger/

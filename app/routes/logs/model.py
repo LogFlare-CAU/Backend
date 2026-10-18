@@ -27,6 +27,8 @@ class Errorlog(Base):
         DateTime, nullable=False, default=lambda: datetime.now(UTC), comment="Timestamp"
     )
 
+    fingerprint = Column(Text, nullable=True, index=True, comment="묶음 지문")
+
     # 단방향 관계: Errorlog.project 로만 접근. Project 쪽에는 컬렉션/역참조 없음.
     project = relationship(
         "Project",

@@ -18,6 +18,7 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
     if str(DATABASE_URL).startswith("sqlite"):
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA journal_mode=WAL")
         cursor.close()
 
 

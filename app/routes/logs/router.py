@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, BackgroundTasks, Request
 from fastapi.responses import Response
 
@@ -9,10 +11,12 @@ from common.schema import (
     response_maker as rm,
 )
 from common.sqlsession import get_db
+from routes.collector.parse import Entry
+from routes.groups.service import record_entry
 from routes.projects.authenticate import get_project_id, require_project_auth
 from routes.user.authenticate import get_userid, require_login
 
-from . import application, schema, service, tasks
+from . import application, schema, tasks
 
 router = APIRouter(prefix="/log", tags=["log"])
 
@@ -68,7 +72,14 @@ async def log_error(
     if log.test:
         return Response(status_code=204)
     projectid = get_project_id(request)
-    error = await service.log_error(conn, projectid, log)
+    entry = Entry(
+        level=log.level.upper(),
+        errortype=log.errortype,
+        message=log.message,
+        ts=datetime.now(UTC),
+    )
+    error, _, _ = await record_entry(conn, projectid, request.state.project.name, entry)
+    await conn.commit()
     bg_tasks.add_task(tasks.notify_error, error_id=error.id, projectid=projectid)
     return Response(status_code=204)
 

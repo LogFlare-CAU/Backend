@@ -34,7 +34,7 @@ _INDEX_HTML = Path(__file__).resolve().parent / "res" / "index.html"
 with open(_INDEX_HTML, "r", encoding="utf-8") as f:
     index_html_content = f.read()
 # ===========================INCLUE ROUTERS HERE===========================
-from routes import fcm, logs, projects, user
+from routes import fcm, groups, logs, projects, user  # noqa: F401
 
 
 @asynccontextmanager
