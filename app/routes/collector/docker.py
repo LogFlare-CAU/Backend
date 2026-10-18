@@ -38,17 +38,18 @@ class DockerClient:
         ]
 
     async def logs(self, container_id: str, since: float) -> list[tuple[datetime, str]]:
-        info = await self._http.get(f"/containers/{container_id}/json")
-        info.raise_for_status()
-        tty = bool(info.json().get("Config", {}).get("Tty"))
         res = await self._http.get(
             f"/containers/{container_id}/logs",
             params={"stdout": 1, "stderr": 1, "timestamps": 1, "since": f"{since:.6f}"},
         )
         res.raise_for_status()
-        text = (res.content if tty else _demux(res.content)).decode("utf-8", "replace")
+        data = res.content
+        # inspect 를 부르지 않고 스트림 머리 [0|1|2, 0, 0, 0] 로 멀티플렉스 여부를 판별한다.
+        mux = data[:1] in (b"\x00", b"\x01", b"\x02") and data[1:4] == b"\x00\x00\x00"
+        text = (_demux(data) if mux else data).decode("utf-8", "replace")
         out = []
-        for line in text.splitlines():
+        for line in text.split("\n"):
+            line = line.rstrip("\r")
             ts, _, msg = line.partition(" ")
             try:
                 out.append((_parse_ts(ts), msg))
@@ -63,7 +64,7 @@ class DockerClient:
                 "since": f"{since:.6f}",
                 "until": f"{until:.6f}",
                 "filters": json.dumps(
-                    {"type": ["container"], "event": ["die", "oom", "health_status"]}
+                    {"type": ["container"], "event": ["die", "oom", "health_status", "restart"]}
                 ),
             },
         )

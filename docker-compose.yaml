@@ -28,7 +28,7 @@ services:
       - edge
       - logflare-docker
 
-  # Read-only Docker API proxy: only container list/inspect and events are allowed.
+  # Read-only Docker API proxy: only GET containers/json, containers/{id}/logs and events.
   logflare-docker-proxy:
     image: tecnativa/docker-socket-proxy:latest
     container_name: logflare-docker-proxy
@@ -59,6 +59,8 @@ services:
       ALLOW_RESTARTS: 0
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      # 컨테이너 목록·로그·이벤트 GET 세 경로만 통과시키는 규칙 템플릿 (inspect·archive·export 는 403).
+      - ./docker-proxy/haproxy.cfg.template:/usr/local/etc/haproxy/haproxy.cfg.template:ro
     networks:
       - logflare-docker
 
