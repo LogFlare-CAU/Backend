@@ -68,3 +68,19 @@ async def test_unregister_other_users_token_noop(
     assert res.status_code == 200, res.text
     assert res.json()["data"] == {"removed": False}
     assert len(await _rows("tok-1")) == 1
+
+
+@pytest.mark.asyncio
+async def test_reassigned_token_survives_pruning(
+    client: AsyncClient, admin_token: str, plain_user
+):
+    # The token that will be reassigned has the lowest idx.
+    assert (await _register(client, admin_token, "old")).status_code == 200
+    for t in ("a", "b", "c"):
+        assert (await _register(client, plain_user[2], t)).status_code == 200
+    res = await _register(client, plain_user[2], "old")
+    assert res.status_code == 200, res.text
+    rows = await _rows("old")
+    assert len(rows) == 1 and rows[0].user_idx == plain_user[3]
+    assert res.json()["data"]["idx"] == rows[0].idx
+    assert await _rows("a") == []  # oldest of the user's tokens pruned
