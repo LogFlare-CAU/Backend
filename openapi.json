@@ -898,6 +898,84 @@
         }
       }
     },
+    "/project/{projectid}/token": {
+      "get": {
+        "tags": [
+          "projects"
+        ],
+        "summary": "프로젝트 API 키 조회",
+        "description": "기존 프로젝트의 ProjectKey를 조회합니다. 프로젝트 접근 권한이 필요합니다.",
+        "operationId": "get_project_token_project__projectid__token_get",
+        "security": [
+          {
+            "Authorization": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Projectid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectResponseWithToken"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/project/{projectid}/logfile": {
       "post": {
         "tags": [
@@ -1322,6 +1400,383 @@
         }
       }
     },
+    "/log/summary": {
+      "get": {
+        "tags": [
+          "log"
+        ],
+        "summary": "로그 레벨 요약",
+        "description": "최근 N시간(1~168, 기본 24) 레벨별 건수와 프로젝트별 에러 통계<br>\n<br>\nproject_id: 지정 시 해당 프로젝트만 (접근 권한 없으면 403)",
+        "operationId": "get_summary_log_summary_get",
+        "security": [
+          {
+            "Authorization": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 24,
+              "title": "Hours"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogSummaryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/log/events": {
+      "get": {
+        "tags": [
+          "log"
+        ],
+        "summary": "로그 이벤트 목록",
+        "description": "필터/그룹핑된 로그 이벤트 목록 (커서 페이지네이션)<br>\n<br>\ngrouped: 묶음 지문(fingerprint), 없으면 (project, errortype, message) 기준 묶음 (기본 true)<br>\nq: message/errortype 대소문자 무시 부분 일치<br>\ncursor: 이전 응답의 next_cursor<br>\n<br>\n400: 잘못된 cursor, 403: 프로젝트 접근 권한 없음",
+        "operationId": "get_events_log_events_get",
+        "security": [
+          {
+            "Authorization": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "min_level",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Level"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Min Level"
+            }
+          },
+          {
+            "name": "logfile_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Logfile Id"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Until"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Sort",
+              "default": "newest"
+            }
+          },
+          {
+            "name": "grouped",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Grouped"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogEventPageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/log/events/{error_id}": {
+      "get": {
+        "tags": [
+          "log"
+        ],
+        "summary": "로그 이벤트 상세",
+        "description": "에러 한 건의 원본(raw)과 같은 그룹의 발생 통계<br>\n<br>\nrecent_ids: 같은 그룹의 최신 ID 최대 10개 (자신 제외, 최신순)<br>\n<br>\n403: 프로젝트 접근 권한 없음, 404: 에러 없음",
+        "operationId": "get_event_detail_log_events__error_id__get",
+        "security": [
+          {
+            "Authorization": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "error_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Error Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogEventDetailResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/log/{project_id}/{logfileid}": {
       "get": {
         "tags": [
@@ -1679,6 +2134,61 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/FCMTokenResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Authorization": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "fcm"
+        ],
+        "summary": "Unregister Fcm Token",
+        "description": "본인 소유의 FCM 토큰을 해제합니다.<br>\n다른 사용자의 토큰이거나 없으면 removed=false 를 반환합니다.",
+        "operationId": "unregister_fcm_token_fcm_token_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FCMTokenParams"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_FCMTokenRemoved_"
                 }
               }
             }
@@ -2161,6 +2671,47 @@
         "type": "object",
         "title": "APIResponse[FCMClientConfig]"
       },
+      "APIResponse_FCMTokenRemoved_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "API 호출 성공 여부",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "처리 결과에 대한 메시지",
+            "default": "success"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code",
+            "description": "에러 코드"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FCMTokenRemoved"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "API 호출 결과 데이터"
+          }
+        },
+        "type": "object",
+        "title": "APIResponse[FCMTokenRemoved]"
+      },
       "APIResponse_list_str__": {
         "properties": {
           "success": {
@@ -2271,6 +2822,30 @@
             "type": "string",
             "title": "Message",
             "description": "에러 메시지"
+          },
+          "logfile": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logfile",
+            "description": "프로젝트 내 로그 파일 이름"
+          },
+          "raw": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw",
+            "description": "원본 로그 페이로드 (64KB 초과 시 잘림)"
           },
           "test": {
             "type": "boolean",
@@ -2409,6 +2984,18 @@
             "title": "Timestamp",
             "description": "Timestamp"
           },
+          "logfile_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logfile Id",
+            "description": "연결된 로그 파일 ID (없으면 NULL)"
+          },
           "fingerprint": {
             "anyOf": [
               {
@@ -2420,17 +3007,6 @@
             ],
             "title": "Fingerprint",
             "description": "묶음 지문"
-          },
-          "project": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/common__schema__sqlalchemy_orm_converter__ProjectDTO__3"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "project 관계"
           }
         },
         "type": "object",
@@ -2581,6 +3157,19 @@
         ],
         "title": "FCMTokenParams"
       },
+      "FCMTokenRemoved": {
+        "properties": {
+          "removed": {
+            "type": "boolean",
+            "title": "Removed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "removed"
+        ],
+        "title": "FCMTokenRemoved"
+      },
       "FCMTokenResponse": {
         "properties": {
           "success": {
@@ -2649,6 +3238,338 @@
         ],
         "title": "IgnoreParams"
       },
+      "Level": {
+        "type": "string",
+        "enum": [
+          "DEBUG",
+          "INFO",
+          "WARNING",
+          "ERROR",
+          "CRITICAL"
+        ],
+        "title": "Level"
+      },
+      "LogEvent": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "그룹의 최신 에러 ID (grouped=false 면 행 ID)"
+          },
+          "project_id": {
+            "type": "integer",
+            "title": "Project Id"
+          },
+          "logfile_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logfile Id"
+          },
+          "logfile_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logfile Name"
+          },
+          "errortype": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Errortype"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "group_key": {
+            "type": "string",
+            "title": "Group Key",
+            "description": "묶음 키: fingerprint, 없으면 project|errortype|message 의 sha1"
+          },
+          "level": {
+            "type": "string",
+            "title": "Level",
+            "description": "그룹 내 최고 레벨"
+          },
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp",
+            "description": "last_seen 과 동일"
+          },
+          "occurrences": {
+            "type": "integer",
+            "title": "Occurrences"
+          },
+          "first_seen": {
+            "type": "string",
+            "title": "First Seen"
+          },
+          "last_seen": {
+            "type": "string",
+            "title": "Last Seen"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "project_id",
+          "message",
+          "group_key",
+          "level",
+          "timestamp",
+          "occurrences",
+          "first_seen",
+          "last_seen"
+        ],
+        "title": "LogEvent"
+      },
+      "LogEventDetail": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id",
+            "description": "그룹의 최신 에러 ID (grouped=false 면 행 ID)"
+          },
+          "project_id": {
+            "type": "integer",
+            "title": "Project Id"
+          },
+          "logfile_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logfile Id"
+          },
+          "logfile_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Logfile Name"
+          },
+          "errortype": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Errortype"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "group_key": {
+            "type": "string",
+            "title": "Group Key",
+            "description": "묶음 키: fingerprint, 없으면 project|errortype|message 의 sha1"
+          },
+          "level": {
+            "type": "string",
+            "title": "Level",
+            "description": "그룹 내 최고 레벨"
+          },
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp",
+            "description": "last_seen 과 동일"
+          },
+          "occurrences": {
+            "type": "integer",
+            "title": "Occurrences"
+          },
+          "first_seen": {
+            "type": "string",
+            "title": "First Seen"
+          },
+          "last_seen": {
+            "type": "string",
+            "title": "Last Seen"
+          },
+          "occurred_at": {
+            "type": "string",
+            "title": "Occurred At",
+            "description": "요청한 행의 발생 시각"
+          },
+          "row_level": {
+            "type": "string",
+            "title": "Row Level",
+            "description": "요청한 행의 레벨 (대문자)"
+          },
+          "raw": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raw",
+            "description": "이 에러의 원본 로그 페이로드"
+          },
+          "recent_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Recent Ids",
+            "description": "같은 그룹의 최신 ID 최대 10개 (자신 제외, 최신순)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "project_id",
+          "message",
+          "group_key",
+          "level",
+          "timestamp",
+          "occurrences",
+          "first_seen",
+          "last_seen",
+          "occurred_at",
+          "row_level"
+        ],
+        "title": "LogEventDetail"
+      },
+      "LogEventDetailResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "API 호출 성공 여부",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "처리 결과에 대한 메시지",
+            "default": "success"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code",
+            "description": "에러 코드"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LogEventDetail"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "API 호출 결과 데이터"
+          }
+        },
+        "type": "object",
+        "title": "LogEventDetailResponse"
+      },
+      "LogEventPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LogEvent"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "LogEventPage"
+      },
+      "LogEventPageResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "API 호출 성공 여부",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "처리 결과에 대한 메시지",
+            "default": "success"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code",
+            "description": "에러 코드"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LogEventPage"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "API 호출 결과 데이터"
+          }
+        },
+        "type": "object",
+        "title": "LogEventPageResponse"
+      },
       "LogFileCreateParams": {
         "properties": {
           "name": {
@@ -2710,6 +3631,81 @@
         "type": "object",
         "title": "LogFileResponse",
         "description": "LogFileResponse"
+      },
+      "LogSummary": {
+        "properties": {
+          "window_hours": {
+            "type": "integer",
+            "title": "Window Hours"
+          },
+          "since": {
+            "type": "string",
+            "title": "Since"
+          },
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Counts"
+          },
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/ProjectSummary"
+            },
+            "type": "array",
+            "title": "Projects"
+          }
+        },
+        "type": "object",
+        "required": [
+          "window_hours",
+          "since",
+          "counts",
+          "projects"
+        ],
+        "title": "LogSummary"
+      },
+      "LogSummaryResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "API 호출 성공 여부",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "처리 결과에 대한 메시지",
+            "default": "success"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code",
+            "description": "에러 코드"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LogSummary"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "API 호출 결과 데이터"
+          }
+        },
+        "type": "object",
+        "title": "LogSummaryResponse"
       },
       "ProjectCreateParams": {
         "properties": {
@@ -2986,6 +3982,43 @@
         "title": "ProjectSequenceResponse",
         "description": "ProjectSequenceResponse"
       },
+      "ProjectSummary": {
+        "properties": {
+          "project_id": {
+            "type": "integer",
+            "title": "Project Id"
+          },
+          "error_count": {
+            "type": "integer",
+            "title": "Error Count",
+            "description": "윈도우 내 ERROR+CRITICAL 수"
+          },
+          "warning_count": {
+            "type": "integer",
+            "title": "Warning Count",
+            "description": "윈도우 내 WARNING 수"
+          },
+          "last_error_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Error At",
+            "description": "가장 최근 ERROR/CRITICAL 시각 (전체 기간, UTC)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "project_id",
+          "error_count",
+          "warning_count"
+        ],
+        "title": "ProjectSummary"
+      },
       "ResetPasswordParams": {
         "properties": {
           "new_password": {
@@ -3000,6 +4033,16 @@
           "new_password"
         ],
         "title": "ResetPasswordParams"
+      },
+      "Sort": {
+        "type": "string",
+        "enum": [
+          "newest",
+          "oldest",
+          "highest",
+          "lowest"
+        ],
+        "title": "Sort"
       },
       "UserAuthParams": {
         "properties": {
