@@ -1,8 +1,9 @@
+from datetime import datetime
 from typing import Sequence
 
 from pydantic import BaseModel, Field
 
-from common.schema import make_named_response
+from common.schema import APIResponse, make_named_response
 
 from . import model
 
@@ -20,3 +21,23 @@ ErrorResponse = make_named_response(model.Errorlog, "ErrorResponse")
 ErrorSequenceResponse = make_named_response(
     Sequence[model.Errorlog], "ErrorSequenceResponse"
 )
+
+
+class ProjectSummary(BaseModel):
+    project_id: int
+    error_count: int = Field(..., description="윈도우 내 ERROR+CRITICAL 수")
+    warning_count: int = Field(..., description="윈도우 내 WARNING 수")
+    last_error_at: datetime | None = Field(
+        None, description="가장 최근 ERROR/CRITICAL 시각 (전체 기간, UTC)"
+    )
+
+
+class LogSummary(BaseModel):
+    window_hours: int
+    since: datetime
+    counts: dict[str, int]
+    projects: list[ProjectSummary]
+
+
+class LogSummaryResponse(APIResponse[LogSummary]):
+    pass

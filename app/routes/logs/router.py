@@ -27,6 +27,28 @@ async def health_check():
 
 
 @router.get(
+    "/summary",
+    dependencies=require_login,
+    summary="로그 레벨 요약",
+    response_model=schema.LogSummaryResponse,
+    responses=rm([401, 403]),
+)
+async def get_summary(
+        request: Request,
+        project_id: int | None = None,
+        hours: int = 24,
+        conn=get_db,
+):
+    """
+    최근 N시간(1~168, 기본 24) 레벨별 건수와 프로젝트별 에러 통계<br>
+    <br>
+    project_id: 지정 시 해당 프로젝트만 (접근 권한 없으면 403)
+    """
+    userid = get_userid(request)
+    return APIResponse(data=await application.get_summary(conn, userid, project_id, hours))
+
+
+@router.get(
     "/{project_id}/{logfileid}",
     dependencies=require_login,
     summary="로그 파일 조회",

@@ -1,4 +1,5 @@
 import re
+from datetime import UTC, datetime, timedelta
 from typing import Sequence
 
 from fastapi import HTTPException
@@ -9,7 +10,7 @@ from common.path_utils import assert_allowed_log_path
 from routes.projects import application as project_app
 from routes.projects import service as project_service
 
-from . import model, service
+from . import model, schema, service
 
 LOG_START_RE = re.compile(
     r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \s*\|\s*\w+\s*\|"
@@ -91,3 +92,23 @@ def group_log_entries(lines: list[str]) -> list[str]:
     if current:
         entries.append(current)
     return ["".join(chunk) for chunk in entries]
+
+
+async def get_summary(
+        conn: AsyncSession, userid: int, project_id: int | None, hours: int
+) -> schema.LogSummary:
+    hours = max(1, min(hours, 168))
+    accessible = [p.id for p in await project_app.get_projects(conn, userid)]
+    if project_id is not None:
+        if project_id not in accessible:
+            raise HTTPException(
+                HTTP_403_FORBIDDEN, detail="You do not have access to this project"
+            )
+        accessible = [project_id]
+    since = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=hours)
+    return schema.LogSummary(
+        window_hours=hours,
+        since=since,
+        counts=await service.count_levels(conn, accessible, since),
+        projects=await service.project_summaries(conn, accessible, since),
+    )
