@@ -23,11 +23,12 @@ async def record_entry(
 ) -> tuple[Errorlog, ErrorGroup, bool]:
     """Errorlog 를 넣고 묶음을 만들거나 갱신한다. commit 은 호출자가 한다.
 
-    raw(원본 페이로드)도 message 처럼 비밀을 가린 뒤 RAW_MAX_LEN 자로 자른다.
+    raw(원본 페이로드)는 RAW_MAX_LEN 자로 먼저 자른 뒤 message 처럼 비밀을 가리고,
+    가리면서 길어질 수 있어 한 번 더 자른다 (경계에서 잘린 비밀 값도 가려진다).
     """
     message = mask_secrets(entry.message)
     if raw is not None:
-        raw = mask_secrets(raw)[:RAW_MAX_LEN]
+        raw = mask_secrets(raw[:RAW_MAX_LEN])[:RAW_MAX_LEN]
     # SQLite 는 tzinfo 를 버리므로 naive UTC 로 통일해 저장·비교한다.
     ts = entry.ts.astimezone(UTC).replace(tzinfo=None) if entry.ts.tzinfo else entry.ts
     fp = fingerprint(source, entry.level, message)

@@ -1,3 +1,4 @@
+import hashlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Sequence
@@ -248,12 +249,21 @@ def _event_select(sub):
             E.logfile_id,
             E.errortype,
             E.message,
+            E.fingerprint,
             func.upper(E.level).label("raw_level"),
             LogFile.file_name,
         )
         .join(E, E.id == sub.c.id)
         .outerjoin(LogFile, LogFile.id == E.logfile_id)
     )
+
+
+def group_key(project_id: int, fingerprint: str | None, errortype: str | None, message: str) -> str:
+    """_group_key 와 같은 기준의 문자열 키: fingerprint, 없으면 옛 키의 sha1."""
+    if fingerprint is not None:
+        return fingerprint
+    legacy = f"p:{project_id}|t:{errortype or ''}|m:{message}"
+    return hashlib.sha1(legacy.encode()).hexdigest()
 
 
 def _to_event(r) -> schema.LogEvent:
@@ -265,6 +275,7 @@ def _to_event(r) -> schema.LogEvent:
         logfile_name=r.file_name,
         errortype=r.errortype,
         message=r.message,
+        group_key=group_key(r.project_id, r.fingerprint, r.errortype, r.message),
         level=names.get(r.lvl, r.raw_level),
         timestamp=r.last_seen,
         occurrences=r.occ,

@@ -100,3 +100,28 @@ async def test_ingest_raw_masks_secrets_and_records_group(client, project_with_k
     row = (await _rows())[0]
     assert "abc.def" not in row.raw and "hunter2" not in row.raw
     assert row.fingerprint is not None
+
+
+@pytest.mark.asyncio
+async def test_ingest_oversized_raw_is_truncated_then_masked(client, project_with_key):
+    from routes.groups.service import RAW_MAX_LEN
+
+    name, token, _ = project_with_key
+    payload = "password=hunter2 " + "y" * (RAW_MAX_LEN + 10) + " password=tail"
+    await _post(client, name, token, raw=payload)
+    raw = (await _rows())[0].raw
+    assert raw.startswith("password=***")
+    assert "hunter2" not in raw and "tail" not in raw
+    assert len(raw) <= RAW_MAX_LEN
+
+
+@pytest.mark.asyncio
+async def test_ingest_raw_cut_secret_at_boundary_is_masked(client, project_with_key):
+    from routes.groups.service import RAW_MAX_LEN
+
+    name, token, _ = project_with_key
+    head = "x" * (RAW_MAX_LEN - 13) + " pwd="
+    await _post(client, name, token, raw=head + "abcdefghijklmnop")
+    raw = (await _rows())[0].raw
+    assert "abcdefgh" not in raw
+    assert len(raw) <= RAW_MAX_LEN

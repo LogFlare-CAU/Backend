@@ -120,3 +120,27 @@ async def test_filtered_occurrences_within_fingerprint_group(client, admin_token
     since = (datetime.now(UTC) - timedelta(minutes=30)).isoformat()
     items = await _events(client, admin_token, since=since)
     assert len(items) == 1 and items[0]["occurrences"] == 1
+
+
+async def test_group_key_matches_grouping(client, admin_token, project_with_key):
+    pid = project_with_key[2]
+    # identical (project, errortype, message) but different fingerprints -> two groups
+    e1 = await _insert(pid, "same text", "fp-err", level="ERROR", ago=3)
+    c1 = await _insert(pid, "same text", "fp-crit", level="CRITICAL", ago=2)
+    # legacy rows (no fingerprint) group by project|errortype|message
+    l1 = await _insert(pid, "same text", None, ago=1)
+    l2 = await _insert(pid, "same text", None, ago=0)
+    items = await _events(client, admin_token)
+    keys = {i["id"]: i["group_key"] for i in items}
+    assert len(items) == 3
+    assert keys[e1] == "fp-err" and keys[c1] == "fp-crit"
+    assert len(keys[l2]) == 40 and keys[l2] not in ("fp-err", "fp-crit")
+
+    flat = await _events(client, admin_token, grouped="false")
+    flat_keys = {i["id"]: i["group_key"] for i in flat}
+    assert flat_keys[l1] == flat_keys[l2] == keys[l2]
+    assert flat_keys[e1] == "fp-err" and flat_keys[c1] == "fp-crit"
+
+    for eid, key in ((l1, keys[l2]), (e1, "fp-err")):
+        d = (await client.get(f"/log/events/{eid}", headers=_auth(admin_token))).json()["data"]
+        assert d["group_key"] == key

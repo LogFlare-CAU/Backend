@@ -56,6 +56,9 @@ class LogEvent(BaseModel):
     logfile_name: str | None = None
     errortype: str | None = None
     message: str
+    group_key: str = Field(
+        ..., description="묶음 키: fingerprint, 없으면 project|errortype|message 의 sha1"
+    )
     level: str = Field(..., description="그룹 내 최고 레벨")
     timestamp: UtcDatetime = Field(..., description="last_seen 과 동일")
     occurrences: int
