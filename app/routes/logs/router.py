@@ -78,9 +78,11 @@ async def log_error(
         message=log.message,
         ts=datetime.now(UTC),
     )
-    error, _, _ = await record_entry(conn, projectid, request.state.project.name, entry)
+    error, _, is_new = await record_entry(conn, projectid, request.state.project.name, entry)
     await conn.commit()
-    bg_tasks.add_task(tasks.notify_error, error_id=error.id, projectid=projectid)
+    bg_tasks.add_task(
+        tasks.notify_error, error_id=error.id, projectid=projectid, is_new=is_new
+    )
     return Response(status_code=204)
 
 
