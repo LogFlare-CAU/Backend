@@ -4,7 +4,8 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 
-_SECRET_KV = re.compile(r"(?i)([\w-]*(?:(?<![A-Za-z])(?:token|key|password|passwd|pwd|secret)|(?-i:(?<=[a-z])(?:Token|Key|Password|Passwd|Pwd|Secret)))[\"']?\s*[=:]\s*[\"']?)([^\s&\"',}]+)")
+# (?<![\w-]) : 단어 중간에서 다시 시작하지 않게 — 없으면 긴 단어에서 O(n^2) 백트래킹
+_SECRET_KV = re.compile(r"(?i)((?<![\w-])[\w-]*(?:(?<![A-Za-z])(?:token|key|password|passwd|pwd|secret)|(?-i:(?<=[a-z])(?:Token|Key|Password|Passwd|Pwd|Secret)))[\"']?\s*[=:]\s*[\"']?)([^\s&\"',}]+)")
 _BEARER = re.compile(r"(?i)\b(Bearer\s+)\S+")
 _URL_USER = re.compile(r"(://)[^/\s:@]+:[^/\s@]+@")
 

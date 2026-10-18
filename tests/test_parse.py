@@ -99,3 +99,12 @@ def test_hex_address_normalized():
 
 def test_mask_camel_case_keys():
     assert "abc" not in mask_secrets("accessToken=abc") and "abc" not in mask_secrets('{"apiKey": "abc"}')
+
+
+def test_mask_secrets_linear_on_long_words():
+    import time
+
+    t = time.perf_counter()
+    out = mask_secrets("y" * 65_536 + " password=hunter2 " + "z" * 65_536)
+    assert time.perf_counter() - t < 2.0
+    assert "hunter2" not in out
