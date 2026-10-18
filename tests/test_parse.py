@@ -83,3 +83,19 @@ def test_chained_exception_is_one_entry():
     assert len(out) == 1 and out[0].errortype == "RuntimeError"
     assert "ValueError: bad" in out[0].message
     assert normalize(out[0].message).startswith("RuntimeError")
+
+
+def test_mask_does_not_overmask_identifiers():
+    for src in ["KeyError: user_id", "monkey=1", "keyboard: 3"]:
+        assert mask_secrets(src) == src
+
+
+def test_hex_address_normalized():
+    a = "<Foo object at 0x7f3a9c1d2e50>"
+    b = "<Foo object at 0x7fb1020304a0>"
+    assert normalize(a) == normalize(b) and "<hex>" in normalize(a)
+    assert fingerprint("x", "ERROR", a) == fingerprint("x", "ERROR", b)
+
+
+def test_mask_camel_case_keys():
+    assert "abc" not in mask_secrets("accessToken=abc") and "abc" not in mask_secrets('{"apiKey": "abc"}')

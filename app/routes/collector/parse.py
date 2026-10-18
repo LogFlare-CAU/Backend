@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 
-_SECRET_KV = re.compile(r"(?i)([\w-]*(?:token|key|password|passwd|pwd|secret)\w*[\"']?\s*[=:]\s*[\"']?)([^\s&\"',}]+)")
+_SECRET_KV = re.compile(r"(?i)([\w-]*(?:(?<![A-Za-z])(?:token|key|password|passwd|pwd|secret)|(?-i:(?<=[a-z])(?:Token|Key|Password|Passwd|Pwd|Secret)))[\"']?\s*[=:]\s*[\"']?)([^\s&\"',}]+)")
 _BEARER = re.compile(r"(?i)\b(Bearer\s+)\S+")
 _URL_USER = re.compile(r"(://)[^/\s:@]+:[^/\s@]+@")
 
@@ -20,6 +20,7 @@ _NORMALIZERS = [
     (re.compile(r"\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:[.,]\d+)?(?:Z|[+-]\d{2}:?\d{2})?"), "<ts>"),
     (re.compile(r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b"), "<uuid>"),
     (re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?\b"), "<ip>"),
+    (re.compile(r"\b0x[0-9a-fA-F]+\b"), "<hex>"),
     (re.compile(r"\b[0-9a-fA-F]{8,}\b"), "<hex>"),
     (re.compile(r"\b\d+(?:\.\d+)?\b"), "<n>"),
 ]
