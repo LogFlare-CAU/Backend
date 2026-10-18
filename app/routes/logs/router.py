@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, BackgroundTasks, Request
+from fastapi import APIRouter, BackgroundTasks, Query, Request
 from fastapi.responses import Response
 
 from common.schema import (
@@ -16,7 +16,8 @@ from routes.groups.service import record_entry
 from routes.projects.authenticate import get_project_id, require_project_auth
 from routes.user.authenticate import get_userid, require_login
 
-from . import application, schema, tasks
+from . import application, schema, service, tasks
+from .enum import Level, Sort
 
 router = APIRouter(prefix="/log", tags=["log"])
 
@@ -46,6 +47,48 @@ async def get_summary(
     """
     userid = get_userid(request)
     return APIResponse(data=await application.get_summary(conn, userid, project_id, hours))
+
+
+@router.get(
+    "/events",
+    dependencies=require_login,
+    summary="로그 이벤트 목록",
+    response_model=schema.LogEventPageResponse,
+    responses=rm([400, 401, 403]),
+)
+async def get_events(
+        request: Request,
+        project_id: int | None = None,
+        min_level: Level | None = None,
+        logfile_id: int | None = None,
+        since: datetime | None = None,
+        until: datetime | None = None,
+        q: str | None = None,
+        sort: Sort = Sort.NEWEST,
+        grouped: bool = True,
+        limit: int = Query(50, ge=1, le=200),
+        cursor: str | None = None,
+        conn=get_db,
+):
+    """
+    필터/그룹핑된 로그 이벤트 목록 (커서 페이지네이션)<br>
+    <br>
+    grouped: (project, errortype, message) 기준 묶음 (기본 true)<br>
+    q: message/errortype 대소문자 무시 부분 일치<br>
+    cursor: 이전 응답의 next_cursor<br>
+    <br>
+    400: 잘못된 cursor, 403: 프로젝트 접근 권한 없음
+    """
+    userid = get_userid(request)
+    filters = service.EventFilters(
+        min_level=min_level, logfile_id=logfile_id, since=since, until=until,
+        q=q, sort=sort, grouped=grouped,
+    )
+    return APIResponse(
+        data=await application.list_events(
+            conn, userid, project_id, filters, limit, cursor
+        )
+    )
 
 
 @router.get(

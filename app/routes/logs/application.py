@@ -1,10 +1,12 @@
+import base64
+import json
 import re
 from datetime import UTC, datetime, timedelta
 from typing import Sequence
 
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.status import HTTP_403_FORBIDDEN
+from starlette.status import HTTP_400_BAD_REQUEST, HTTP_403_FORBIDDEN
 
 from common.path_utils import assert_allowed_log_path
 from routes.projects import application as project_app
@@ -112,3 +114,49 @@ async def get_summary(
         counts=await service.count_levels(conn, accessible, since),
         projects=await service.project_summaries(conn, accessible, since),
     )
+
+
+def encode_cursor(offset: int, ceiling: datetime) -> str:
+    raw = json.dumps({"o": offset, "t": ceiling.isoformat()}, separators=(",", ":"))
+    return base64.urlsafe_b64encode(raw.encode()).decode()
+
+
+def decode_cursor(cursor: str) -> tuple[int, datetime]:
+    try:
+        data = json.loads(base64.urlsafe_b64decode(cursor.encode()))
+        offset, ceiling = data["o"], datetime.fromisoformat(data["t"])
+        if not isinstance(offset, int) or isinstance(offset, bool) or offset < 0:
+            raise ValueError("bad offset")
+        return offset, ceiling.replace(tzinfo=None)
+    except (ValueError, KeyError, TypeError):
+        raise HTTPException(HTTP_400_BAD_REQUEST, detail="Invalid cursor") from None
+
+
+async def list_events(
+        conn: AsyncSession,
+        userid: int,
+        project_id: int | None,
+        filters: service.EventFilters,
+        limit: int,
+        cursor: str | None,
+) -> schema.LogEventPage:
+    accessible = [p.id for p in await project_app.get_projects(conn, userid)]
+    if project_id is not None:
+        if project_id not in accessible:
+            raise HTTPException(
+                HTTP_403_FORBIDDEN, detail="You do not have access to this project"
+            )
+        accessible = [project_id]
+    if cursor:
+        offset, ceiling = decode_cursor(cursor)
+    else:
+        offset = 0
+        ceiling = await service.newest_event_time(conn, accessible, filters)
+    items = await service.list_events(
+        conn, accessible, filters, offset, limit + 1, ceiling
+    )
+    next_cursor = None
+    if len(items) > limit:
+        items = items[:limit]
+        next_cursor = encode_cursor(offset + limit, ceiling)
+    return schema.LogEventPage(items=items, next_cursor=next_cursor)

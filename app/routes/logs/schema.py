@@ -41,3 +41,26 @@ class LogSummary(BaseModel):
 
 class LogSummaryResponse(APIResponse[LogSummary]):
     pass
+
+
+class LogEvent(BaseModel):
+    id: int = Field(..., description="그룹의 최신 에러 ID (grouped=false 면 행 ID)")
+    project_id: int
+    logfile_id: int | None = None
+    logfile_name: str | None = None
+    errortype: str | None = None
+    message: str
+    level: str = Field(..., description="그룹 내 최고 레벨")
+    timestamp: datetime = Field(..., description="last_seen 과 동일")
+    occurrences: int
+    first_seen: datetime
+    last_seen: datetime
+
+
+class LogEventPage(BaseModel):
+    items: list[LogEvent]
+    next_cursor: str | None = None
+
+
+class LogEventPageResponse(APIResponse[LogEventPage]):
+    pass

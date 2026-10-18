@@ -1,15 +1,17 @@
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Sequence
 
-from sqlalchemy import case, func, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from common.sortingutils import LEVEL_ORDER, get_sort_order
+from common.sortingutils import LEVEL_ORDER, get_sort_order, level_order_expr
 
+from routes.projects.model import LogFile
 from routes.projects.service import get_logfile_by_name
 
 from . import model, schema
-from .enum import Level
+from .enum import Level, Sort
 
 RAW_MAX_LEN = 65_536
 
@@ -136,3 +138,141 @@ async def project_summaries(
             )
         )
     return result
+
+
+@dataclass
+class EventFilters:
+    min_level: Level | None = None
+    logfile_id: int | None = None
+    since: datetime | None = None
+    until: datetime | None = None
+    q: str | None = None
+    sort: Sort = Sort.NEWEST
+    grouped: bool = True
+
+
+def _event_conditions(
+        project_ids: Sequence[int], f: EventFilters, ceiling: datetime | None = None
+) -> list:
+    E = model.Errorlog
+    conds = [E.project_id.in_(list(project_ids))]
+    if f.min_level is not None:
+        floor = LEVEL_ORDER.index(f.min_level) + 1
+        conds.append(level_order_expr(func.upper(E.level)) >= floor)
+    if f.logfile_id is not None:
+        conds.append(E.logfile_id == f.logfile_id)
+    if f.since is not None:
+        conds.append(E.timestamp >= f.since)
+    if f.until is not None:
+        conds.append(E.timestamp <= f.until)
+    if ceiling is not None:
+        conds.append(E.timestamp <= ceiling)
+    if f.q:
+        pattern = f"%{f.q.lower()}%"
+        conds.append(
+            or_(
+                func.lower(E.message).like(pattern),
+                func.lower(func.coalesce(E.errortype, "")).like(pattern),
+            )
+        )
+    return conds
+
+
+async def newest_event_time(
+        conn: AsyncSession, project_ids: Sequence[int], f: EventFilters
+) -> datetime | None:
+    if not project_ids:
+        return None
+    stmt = select(func.max(model.Errorlog.timestamp)).where(
+        *_event_conditions(project_ids, f)
+    )
+    return (await conn.execute(stmt)).scalar()
+
+
+async def list_events(
+        conn: AsyncSession,
+        project_ids: Sequence[int],
+        filters: EventFilters,
+        offset: int,
+        limit: int,
+        ceiling: datetime | None = None,
+) -> list[schema.LogEvent]:
+    """필터링/그룹핑된 이벤트 목록.
+
+    ceiling 은 그룹핑 전 행 필터(timestamp <= ceiling)로 적용한다.
+    그룹 키: (project_id, coalesce(errortype, ''), message).
+    """
+    if not project_ids:
+        return []
+    E = model.Errorlog
+    order = level_order_expr(func.upper(E.level))
+    where = _event_conditions(project_ids, filters, ceiling)
+    if filters.grouped:
+        inner = (
+            select(
+                func.max(E.id).label("id"),
+                func.count().label("occ"),
+                func.min(E.timestamp).label("first_seen"),
+                func.max(E.timestamp).label("last_seen"),
+                func.max(order).label("lvl"),
+            )
+            .where(*where)
+            .group_by(E.project_id, func.coalesce(E.errortype, ""), E.message)
+        )
+    else:
+        inner = select(
+            E.id.label("id"),
+            func.count().label("occ"),
+            E.timestamp.label("first_seen"),
+            E.timestamp.label("last_seen"),
+            order.label("lvl"),
+        ).where(*where).group_by(E.id)
+    sub = inner.subquery()
+
+    match filters.sort:
+        case Sort.OLDEST:
+            ordering = [sub.c.last_seen.asc(), sub.c.id.asc()]
+        case Sort.HIGHEST:
+            ordering = [sub.c.lvl.desc(), sub.c.last_seen.desc(), sub.c.id.desc()]
+        case Sort.LOWEST:
+            ordering = [sub.c.lvl.asc(), sub.c.last_seen.desc(), sub.c.id.desc()]
+        case _:
+            ordering = [sub.c.last_seen.desc(), sub.c.id.desc()]
+
+    stmt = (
+        select(
+            sub.c.id,
+            sub.c.occ,
+            sub.c.first_seen,
+            sub.c.last_seen,
+            sub.c.lvl,
+            E.project_id,
+            E.logfile_id,
+            E.errortype,
+            E.message,
+            func.upper(E.level).label("raw_level"),
+            LogFile.file_name,
+        )
+        .join(E, E.id == sub.c.id)
+        .outerjoin(LogFile, LogFile.id == E.logfile_id)
+        .order_by(*ordering)
+        .limit(limit)
+        .offset(offset)
+    )
+    names = {i: lvl.value for i, lvl in enumerate(LEVEL_ORDER, start=1)}
+    return [
+        schema.LogEvent(
+            id=r.id,
+            project_id=r.project_id,
+            logfile_id=r.logfile_id,
+            logfile_name=r.file_name,
+            errortype=r.errortype,
+            message=r.message,
+            level=names.get(r.lvl, r.raw_level),
+            timestamp=r.last_seen,
+            occurrences=r.occ,
+            first_seen=r.first_seen,
+            last_seen=r.last_seen,
+        )
+        for r in (await conn.execute(stmt)).all()
+    ]
