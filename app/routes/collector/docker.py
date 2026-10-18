@@ -27,6 +27,9 @@ class DockerClient:
     def __init__(self, base_url: str, transport: httpx.AsyncBaseTransport | None = None):
         self._http = httpx.AsyncClient(base_url=base_url, transport=transport, timeout=30)
 
+    async def aclose(self) -> None:
+        await self._http.aclose()
+
     async def list_containers(self) -> list[dict]:
         res = await self._http.get("/containers/json")
         res.raise_for_status()

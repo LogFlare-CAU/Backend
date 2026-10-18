@@ -1,3 +1,4 @@
+import asyncio
 import traceback
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -34,7 +35,9 @@ _INDEX_HTML = Path(__file__).resolve().parent / "res" / "index.html"
 with open(_INDEX_HTML, "r", encoding="utf-8") as f:
     index_html_content = f.read()
 # ===========================INCLUE ROUTERS HERE===========================
-from routes import fcm, groups, logs, projects, user  # noqa: F401
+from routes import fcm, groups, logs, projects, summary, user  # noqa: F401
+from routes.collector.collector import run_collector
+from routes.collector.docker import DockerClient
 
 
 @asynccontextmanager
@@ -42,8 +45,15 @@ async def lifespan(app: FastAPI):
     # 앱 시작 시 초기화 작업
     fcm.init()
     await user.init_superuser()
+    docker_url = getenvval("LOGFLARE_DOCKER_URL", "")
+    docker = DockerClient(docker_url) if docker_url else None
+    task = asyncio.create_task(run_collector(docker)) if docker else None
     yield
     # 앱 종료 시 정리 작업
+    if task:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        await docker.aclose()
 
 root_path = getenvval("LOGFLARE_API_ROOT_PATH", "")
 app = FastAPI(title=title, version=version, description=description, lifespan=lifespan, root_path=root_path, docs_url=None, redoc_url=None, openapi_url=None)
@@ -51,6 +61,8 @@ app.include_router(user.router)
 app.include_router(projects.router)
 app.include_router(logs.router)
 app.include_router(fcm.router)
+app.include_router(groups.router)
+app.include_router(summary.router)
 # ===========================================================================
 
 
