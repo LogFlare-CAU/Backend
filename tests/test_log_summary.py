@@ -46,7 +46,7 @@ async def test_summary_counts_last_24h_only(client, admin_token, project_with_ke
     assert data["counts"] == {
         "DEBUG": 0, "INFO": 0, "WARNING": 1, "ERROR": 1, "CRITICAL": 0,
     }
-    assert "+" not in data["since"] and not data["since"].endswith("Z")
+    assert data["since"].endswith("+00:00")
 
 
 async def test_summary_counts_lowercase_levels(client, admin_token, project_with_key):

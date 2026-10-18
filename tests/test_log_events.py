@@ -54,7 +54,7 @@ async def test_events_grouped_counts(client, admin_token, project_with_key):
     assert first["id"] == ids[-1]
     assert first["first_seen"] < first["last_seen"]
     assert first["timestamp"] == first["last_seen"]
-    assert "+" not in first["last_seen"] and not first["last_seen"].endswith("Z")
+    assert first["last_seen"].endswith("+00:00")
     assert data["next_cursor"] is None
 
 
@@ -213,3 +213,14 @@ async def test_events_q_escapes_like_wildcards(client, admin_token, project_with
     assert [i["message"] for i in data["items"]] == ["user_id missing"]
     data = await _get(client, admin_token, "q=%25")
     assert [i["message"] for i in data["items"]] == ["100% done"]
+
+
+async def test_event_timestamps_carry_utc_offset(client, admin_token, project_with_key):
+    pid = project_with_key[2]
+    eid = await _insert(pid, "tz-out")
+    item = (await _get(client, admin_token))["items"][0]
+    for key in ("timestamp", "first_seen", "last_seen"):
+        assert item[key].endswith("+00:00"), item[key]
+        assert datetime.fromisoformat(item[key]).tzinfo is not None
+    res = await client.get(f"/log/events/{eid}", headers=_auth(admin_token))
+    assert res.json()["data"]["occurred_at"].endswith("+00:00")

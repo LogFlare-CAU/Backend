@@ -1,11 +1,17 @@
 from datetime import datetime
-from typing import Sequence
+from typing import Annotated, Sequence
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PlainSerializer
 
 from common.schema import APIResponse, make_named_response
+from common.timeutil import utc_iso
 
 from . import model
+
+# DB 는 naive UTC — 응답은 /group·/summary 와 같이 UTC 오프셋이 붙은 ISO 로 낸다.
+UtcDatetime = Annotated[
+    datetime, PlainSerializer(utc_iso, return_type=str, when_used="json")
+]
 
 
 class ErrorParams(BaseModel):
@@ -27,14 +33,14 @@ class ProjectSummary(BaseModel):
     project_id: int
     error_count: int = Field(..., description="윈도우 내 ERROR+CRITICAL 수")
     warning_count: int = Field(..., description="윈도우 내 WARNING 수")
-    last_error_at: datetime | None = Field(
+    last_error_at: UtcDatetime | None = Field(
         None, description="가장 최근 ERROR/CRITICAL 시각 (전체 기간, UTC)"
     )
 
 
 class LogSummary(BaseModel):
     window_hours: int
-    since: datetime
+    since: UtcDatetime
     counts: dict[str, int]
     projects: list[ProjectSummary]
 
@@ -51,14 +57,14 @@ class LogEvent(BaseModel):
     errortype: str | None = None
     message: str
     level: str = Field(..., description="그룹 내 최고 레벨")
-    timestamp: datetime = Field(..., description="last_seen 과 동일")
+    timestamp: UtcDatetime = Field(..., description="last_seen 과 동일")
     occurrences: int
-    first_seen: datetime
-    last_seen: datetime
+    first_seen: UtcDatetime
+    last_seen: UtcDatetime
 
 
 class LogEventDetail(LogEvent):
-    occurred_at: datetime = Field(..., description="요청한 행의 발생 시각")
+    occurred_at: UtcDatetime = Field(..., description="요청한 행의 발생 시각")
     row_level: str = Field(..., description="요청한 행의 레벨 (대문자)")
     raw: str | None = Field(None, description="이 에러의 원본 로그 페이로드")
     recent_ids: list[int] = Field(

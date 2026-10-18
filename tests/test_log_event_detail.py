@@ -2,6 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 from common.sqlsession import async_session
+from common.timeutil import utc_iso
 from routes.logs.model import Errorlog
 from sqlalchemy import select
 
@@ -89,10 +90,10 @@ async def test_event_detail_row_fields_from_requested_row(
     assert d["id"] == old_id
     assert d["logfile_id"] == files["a.log"] and d["logfile_name"] == "a.log"
     assert d["row_level"] == "WARNING"
-    assert d["occurred_at"] == old_ts.isoformat()
+    assert d["occurred_at"] == utc_iso(old_ts)
     assert d["level"] == "CRITICAL"
     assert d["occurrences"] == 2
-    assert d["timestamp"] == d["last_seen"] == new_ts.isoformat()
+    assert d["timestamp"] == d["last_seen"] == utc_iso(new_ts)
     d = (await client.get(f"/log/events/{new_id}", headers=_auth(admin_token))).json()["data"]
     assert d["logfile_name"] == "b.log" and d["row_level"] == "CRITICAL"
 
