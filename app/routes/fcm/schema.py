@@ -27,4 +27,8 @@ class FCMTokenParams(BaseModel):
     fcm_token: str = Field(..., description="FCM 토큰")
 
 
+class FCMTokenRemoved(BaseModel):
+    removed: bool
+
+
 FCMTokenResponse = make_named_response(FCMToken, "FCMTokenResponse")

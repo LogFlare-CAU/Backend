@@ -50,6 +50,26 @@ async def register_fcm_token(
     return APIResponse(data=dict(token))
 
 
+@router.delete(
+    "/token",
+    response_model=APIResponse[schema.FCMTokenRemoved],
+    responses=r_make([401]),
+    dependencies=require_login,
+)
+async def unregister_fcm_token(
+        request: Request,
+        fcm_data: schema.FCMTokenParams,
+        conn=get_db,
+):
+    """
+    본인 소유의 FCM 토큰을 해제합니다.<br>
+    다른 사용자의 토큰이거나 없으면 removed=false 를 반환합니다.
+    """
+    user = get_userid(request)
+    removed = await service.remove_user_fcm_token(conn, user, fcm_data.fcm_token)
+    return APIResponse(data={"removed": removed})
+
+
 @router.post("/test", dependencies=require_moderator)
 async def test_fcm_notification(
         request: Request,

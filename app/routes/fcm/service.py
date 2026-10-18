@@ -10,12 +10,20 @@ from . import model, schema
 async def register_fcm_token(
     conn: AsyncSession, userid: int, item: schema.FCMTokenParams
 ) -> model.FCMToken:
-    fcm_token = model.FCMToken(
-        user_idx=userid,
-        fcm_token=item.fcm_token,
-        last_delivery=datetime.now(UTC),
+    result = await conn.execute(
+        select(model.FCMToken).where(model.FCMToken.fcm_token == item.fcm_token)
     )
-    conn.add(fcm_token)
+    fcm_token = result.scalars().first()
+    now = datetime.now(UTC)
+    if fcm_token:
+        # Idempotent: refresh, and reassign if the device changed account.
+        fcm_token.user_idx = userid
+        fcm_token.last_delivery = now
+    else:
+        fcm_token = model.FCMToken(
+            user_idx=userid, fcm_token=item.fcm_token, last_delivery=now
+        )
+        conn.add(fcm_token)
     await conn.commit()
     await conn.refresh(fcm_token)
     await clean_fcm_tokens(conn, userid)
@@ -31,6 +39,24 @@ async def remove_fcm_token(conn: AsyncSession, fcm_token: str) -> None:
     if token:
         await conn.delete(token)
         await conn.commit()
+
+
+async def remove_user_fcm_token(
+    conn: AsyncSession, userid: int, fcm_token: str
+) -> bool:
+    """Delete the token only if it belongs to the user. Returns whether removed."""
+    result = await conn.execute(
+        select(model.FCMToken).where(
+            model.FCMToken.fcm_token == fcm_token,
+            model.FCMToken.user_idx == userid,
+        )
+    )
+    token = result.scalars().first()
+    if not token:
+        return False
+    await conn.delete(token)
+    await conn.commit()
+    return True
 
 
 async def clean_fcm_tokens(conn: AsyncSession, userid: int) -> None:
