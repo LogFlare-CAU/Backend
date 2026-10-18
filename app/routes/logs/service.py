@@ -13,25 +13,15 @@ from routes.projects.service import get_logfile_by_name
 from . import model, schema
 from .enum import Level, Sort
 
-RAW_MAX_LEN = 65_536
 
-
-async def log_error(
-        conn: AsyncSession, projectid, item: schema.ErrorParams
-) -> model.Errorlog:
-    newerror = model.Errorlog()
-    newerror.project_id = projectid
-    newerror.errortype = item.errortype
-    newerror.message = item.message
-    newerror.level = item.level.upper()
-    newerror.raw = item.raw[:RAW_MAX_LEN] if item.raw is not None else None
-    if item.logfile:
-        logfile = await get_logfile_by_name(conn, projectid, item.logfile)
-        newerror.logfile_id = logfile.id if logfile else None
-    conn.add(newerror)
-    await conn.commit()
-    await conn.refresh(newerror)
-    return newerror
+async def resolve_logfile_id(
+        conn: AsyncSession, projectid: int, name: str | None
+) -> int | None:
+    """수신 바디의 logfile 이름을 프로젝트의 로그 파일 ID 로 (없으면 None)."""
+    if not name:
+        return None
+    logfile = await get_logfile_by_name(conn, projectid, name)
+    return logfile.id if logfile else None
 
 
 async def get_errors(

@@ -193,5 +193,5 @@ async def test_get_errors_item_key_set(client, admin_token, project_with_key):
     for item in items:
         assert set(item) == {
             "id", "project_id", "errortype", "message", "level",
-            "timestamp", "logfile_id",
+            "timestamp", "logfile_id", "fingerprint",
         }

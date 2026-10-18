@@ -90,3 +90,13 @@ async def test_delete_logfile_keeps_errors(
     rows = await _rows()
     assert len(rows) == 1
     assert rows[0].logfile_id is None
+
+
+@pytest.mark.asyncio
+async def test_ingest_raw_masks_secrets_and_records_group(client, project_with_key):
+    """raw 도 message 처럼 비밀을 가리고, 수신은 묶음(fingerprint) 기록을 유지한다."""
+    name, token, _ = project_with_key
+    await _post(client, name, token, raw="POST /x Authorization: Bearer abc.def password=hunter2")
+    row = (await _rows())[0]
+    assert "abc.def" not in row.raw and "hunter2" not in row.raw
+    assert row.fingerprint is not None

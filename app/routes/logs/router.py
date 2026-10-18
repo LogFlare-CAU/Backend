@@ -162,7 +162,14 @@ async def log_error(
         message=log.message,
         ts=datetime.now(UTC),
     )
-    error, _, is_new = await record_entry(conn, projectid, request.state.project.name, entry)
+    error, _, is_new = await record_entry(
+        conn,
+        projectid,
+        request.state.project.name,
+        entry,
+        logfile_id=await service.resolve_logfile_id(conn, projectid, log.logfile),
+        raw=log.raw,
+    )
     await conn.commit()
     bg_tasks.add_task(
         tasks.notify_error, error_id=error.id, projectid=projectid, is_new=is_new
