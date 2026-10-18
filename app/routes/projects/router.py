@@ -82,6 +82,22 @@ async def rotate_project_token(
     return APIResponse(data=payload)
 
 
+@router.get(
+    "/{projectid}/token",
+    summary="프로젝트 API 키 조회",
+    dependencies=require_moderator,
+    responses=rm([401, 403, 404]),
+    response_model=schema.ProjectResponseWithToken,
+)
+async def get_project_token(
+        request: Request, projectid: int, conn=get_db
+) -> APIResponse:
+    """기존 프로젝트의 ProjectKey를 조회합니다."""
+    project = await service.get_project(conn, projectid)
+    payload = {c.name: getattr(project, c.name) for c in project.__table__.columns}
+    return APIResponse(data=payload)
+
+
 @router.post(
     "/{projectid}/logfile",
     summary="로그파일 추가",
