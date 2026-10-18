@@ -45,6 +45,9 @@ cp compose.override.example.yaml docker-compose.override.yaml
 docker compose up -d --build
 ```
 
+* `logflare-docker-proxy` (`tecnativa/docker-socket-proxy`): read-only Docker API proxy (container list/inspect and events only) on the internal `logflare-docker` network; the Docker socket is never mounted into `logflare`.
+* Read token for `/summary`: `mkdir -p secrets && openssl rand -hex 32 > secrets/logflare-read-token` (`secrets/` is gitignored; mounted read-only at `/run/secrets`).
+
 ## Tests / lint
 
 ```bash
@@ -80,3 +83,5 @@ python projectmanager.py
 | `LOGFLARE_LOG_ROOTS` | Allowed logfile directory roots |
 | `SUPERUSER_NAME` / `SUPERUSER_PASSWORD` | Bootstrap admin |
 | `FCM_KEY_FILE` / `FCM_GOOGLE_FILE` | Firebase credentials paths |
+| `LOGFLARE_DOCKER_URL` | Docker API proxy URL for log collector (Compose sets `http://logflare-docker-proxy:2375`) |
+| `LOGFLARE_READ_TOKEN_FILE` | Token file guarding `/summary` (Compose sets `/run/secrets/logflare-read-token`) |

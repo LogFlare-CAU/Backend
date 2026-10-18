@@ -16,3 +16,6 @@ docker-compose.override.yaml
 tests/_test.sqlite*
 tests/fixtures/
 /clients/Python-Logger/
+
+# Read token file (created locally, never committed)
+secrets/

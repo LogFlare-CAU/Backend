@@ -8,10 +8,14 @@ services:
     restart: unless-stopped
     env_file:
       - ./logflare.env
+    environment:
+      - LOGFLARE_DOCKER_URL=http://logflare-docker-proxy:2375
+      - LOGFLARE_READ_TOKEN_FILE=/run/secrets/logflare-read-token
     volumes:
       - ./app:/app
       - ./logs:/logs
       - ./logflare_env:/env
+      - ./secrets:/run/secrets:ro
       # Host-specific log mounts: use docker-compose.override.yaml (see compose.override.example.yaml)
     working_dir: /app
     command:
@@ -22,6 +26,41 @@ services:
     networks:
       - logflare
       - edge
+      - logflare-docker
+
+  # Read-only Docker API proxy: only container list/inspect and events are allowed.
+  logflare-docker-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    container_name: logflare-docker-proxy
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1
+      EVENTS: 1
+      POST: 0
+      EXEC: 0
+      IMAGES: 0
+      VOLUMES: 0
+      NETWORKS: 0
+      BUILD: 0
+      SERVICES: 0
+      TASKS: 0
+      SECRETS: 0
+      CONFIGS: 0
+      PLUGINS: 0
+      SYSTEM: 0
+      INFO: 0
+      NODES: 0
+      SWARM: 0
+      AUTH: 0
+      DISTRIBUTION: 0
+      SESSION: 0
+      ALLOW_START: 0
+      ALLOW_STOP: 0
+      ALLOW_RESTARTS: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - logflare-docker
 
 networks:
   edge:
@@ -30,3 +69,5 @@ networks:
   logflare:
     external:
       true
+  logflare-docker:
+    internal: true
