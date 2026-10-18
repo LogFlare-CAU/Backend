@@ -109,6 +109,17 @@ async def add_logfile(
     return logfile
 
 
+async def get_logfile_by_name(
+        conn: AsyncSession, project_id: int, name: str
+) -> model.LogFile | None:
+    stmt = select(model.LogFile).where(
+        model.LogFile.project_id == project_id,
+        model.LogFile.file_name == name,
+    )
+    result = await conn.execute(stmt)
+    return result.scalars().first()
+
+
 async def delete_logfile(
         conn: AsyncSession, projectid: int, logfileid: int
 ) -> model.LogFile:

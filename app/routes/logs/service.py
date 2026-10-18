@@ -5,7 +5,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.sortingutils import get_sort_order
 
+from routes.projects.service import get_logfile_by_name
+
 from . import model, schema
+
+RAW_MAX_LEN = 65_536
 
 
 async def log_error(
@@ -15,7 +19,11 @@ async def log_error(
     newerror.project_id = projectid
     newerror.errortype = item.errortype
     newerror.message = item.message
-    newerror.level = item.level
+    newerror.level = item.level.upper()
+    newerror.raw = item.raw[:RAW_MAX_LEN] if item.raw is not None else None
+    if item.logfile:
+        logfile = await get_logfile_by_name(conn, projectid, item.logfile)
+        newerror.logfile_id = logfile.id if logfile else None
     conn.add(newerror)
     await conn.commit()
     await conn.refresh(newerror)

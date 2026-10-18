@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, Text
+from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, Text
 from sqlalchemy.orm import relationship
 
 from common.basemodel import Base
@@ -8,6 +8,10 @@ from common.basemodel import Base
 
 class Errorlog(Base):
     __tablename__ = "errorlogs"
+    __table_args__ = (
+        Index("ix_errorlogs_project_ts", "project_id", "timestamp"),
+        Index("ix_errorlogs_level", "level"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True, comment="ID")
     project_id = Column(
@@ -26,6 +30,13 @@ class Errorlog(Base):
     timestamp = Column(
         DateTime, nullable=False, default=lambda: datetime.now(UTC), comment="Timestamp"
     )
+    logfile_id = Column(
+        Integer,
+        ForeignKey("log_files.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="연결된 로그 파일 ID (없으면 NULL)",
+    )
+    raw = Column(Text, nullable=True, comment="원본 로그 페이로드 (최대 64KB)")
 
     fingerprint = Column(Text, nullable=True, index=True, comment="묶음 지문")
 
@@ -34,4 +45,9 @@ class Errorlog(Base):
         "Project",
         lazy="selectin",
         passive_deletes=True,  # 부모(Project) 삭제 시 FK ondelete를 신뢰(사전 로드/DELETE 없이)
+    )
+    logfile = relationship(
+        "LogFile",
+        lazy="selectin",
+        passive_deletes=True,  # LogFile 삭제 시 FK ondelete=SET NULL 을 신뢰
     )
