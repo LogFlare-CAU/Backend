@@ -4,7 +4,7 @@ Reference for the endpoints and ingest fields added in the app rework. All respo
 
 ## Deploy
 
-Run the migration before starting the new server (migration `b7c1d2e3f4a5`, adds `errorlogs.logfile_id`, `errorlogs.raw`, two indexes, and uppercases existing `level` values):
+Run the migration before starting the new server (migration `b7c1d2e3f4a5`, revises `b7c8d9e0f1a2` (error_groups); adds `errorlogs.logfile_id`, `errorlogs.raw`, two indexes, and uppercases existing `level` values). On SQLite the `errorlogs` table is rebuilt (batch mode), so back up the DB first and expect roughly 10-15 s per million rows:
 
 ```bash
 cd app/alembic && alembic upgrade head
@@ -26,8 +26,9 @@ cd app/alembic && alembic upgrade head
 * `since` / `until` accept ISO 8601 with or without a UTC offset; offsets are converted to UTC (`11:00+09:00` is `02:00Z`). Values without an offset are treated as UTC.
 * `cursor` is opaque and only valid with the same filters and sort that produced it. A malformed cursor returns 400.
 * `q` is a literal, case-insensitive substring match (`%` and `_` have no special meaning).
+* Response timestamps (`since`, `last_error_at`, `timestamp`, `first_seen`, `last_seen`, `occurred_at`) are ISO 8601 in UTC with an explicit offset, e.g. `2026-10-18T03:00:00.123456+00:00` (same format as `/group` and `/summary`; fractional seconds appear when stored).
 
-**Grouping (list).** With `grouped=true` (default), events are grouped by (project, errortype, message; NULL errortype is its own group). Per item: `id` is the latest row id in the group, `level` is the highest level in the group, `timestamp` equals `last_seen`, and `occurrences` counts the rows that match the active filters. With `grouped=false`, `id` is the row id and `occurrences` is 1.
+**Grouping (list).** With `grouped=true` (default), events are grouped by the error group fingerprint that ingest computes (`errorlogs.fingerprint`, the same key as `/group`): normalized message (numbers, ids, quoted strings, timestamps masked) plus source and level, scoped to the project. So `user 12 not found` and `user 34 not found` are one group. Rows without a fingerprint fall back to (project, errortype, message; NULL errortype is its own group); the migration backfills fingerprints, so this only affects rows written outside the normal ingest path. Groups marked `ignored` via `PATCH /group/{id}` are **not** filtered out (the app has no ignore UI). The item's `errortype` and `message` are those of the latest row in the group. Per item: `id` is the latest row id in the group, `level` is the highest level in the group, `timestamp` equals `last_seen`, and `occurrences` counts the rows that match the active filters. With `grouped=false`, `id` is the row id and `occurrences` is 1.
 
 **Detail.** `GET /log/events/{id}` returns row-specific fields from the requested row: `id`, `raw`, `occurred_at` (the row's timestamp), `row_level` (the row's level, uppercase), `logfile_id`, `logfile_name`. Group-wide fields cover the whole group: `occurrences`, `first_seen`, `last_seen`, `level` (highest) and `timestamp` (= `last_seen`, same as the list). Detail `occurrences` is all-time, whereas list counts respect the filters.
 
@@ -51,9 +52,9 @@ cd app/alembic && alembic upgrade head
 Two new optional fields in the body, alongside `errortype`, `level`, `message`, `test`:
 
 * `logfile` (string, optional): name of a log file registered to the project (`POST /project/{id}/logfile`). If no file with that name exists, `logfile_id` is stored as `NULL`.
-* `raw` (string, optional): original log payload. Stored truncated to the first 65,536 characters.
+* `raw` (string, optional): original log payload. Secrets are masked the same way as `message` (`password=***`, `Bearer ***`, URL credentials), then stored truncated to the first 65,536 characters.
 
-Both are optional, so existing clients keep working. The response is still `204`.
+Both are optional, so existing clients keep working. The response is still `204`. Ingest still records the error group and sends the "new group" push as before.
 
 ### Level normalization
 
@@ -61,7 +62,7 @@ Both are optional, so existing clients keep working. The response is still `204`
 
 ### `GET /log/error`
 
-Items no longer include `raw` (use `GET /log/events/{id}`) or the `project` / `logfile` relation keys. Keys are `id`, `project_id`, `errortype`, `message`, `level`, `timestamp`, `logfile_id`.
+Items no longer include `raw` (use `GET /log/events/{id}`) or the `project` / `logfile` relation keys. Keys are `id`, `project_id`, `errortype`, `message`, `level`, `timestamp`, `logfile_id`, `fingerprint` (`fingerprint` was already returned by this server before the app rework). Timestamps here keep the existing format without an offset (UTC).
 
 ### `GET /log/{project_id}/{logfileid}`
 
