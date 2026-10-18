@@ -188,8 +188,38 @@ async def newest_event_time(
     return (await conn.execute(stmt)).scalar()
 
 
+def _group_key() -> list:
+    """그룹 키: fingerprint 가 있으면 (project_id, fingerprint),
+    없으면(옛 행) (project_id, coalesce(errortype, ''), message).
+
+    fingerprint 가 있는 행은 나머지 키가 NULL 이 되어 fingerprint 로만 묶이고,
+    없는 행은 fingerprint 가 NULL 로 같아서 옛 키로 묶인다.
+    """
+    E = model.Errorlog
+    legacy = E.fingerprint.is_(None)
+    return [
+        E.project_id,
+        E.fingerprint,
+        case((legacy, func.coalesce(E.errortype, ""))),
+        case((legacy, E.message)),
+    ]
+
+
+def _same_group(row: model.Errorlog) -> list:
+    """row 와 같은 그룹(_group_key 기준)에 속하는 행 조건."""
+    E = model.Errorlog
+    if row.fingerprint is not None:
+        return [E.project_id == row.project_id, E.fingerprint == row.fingerprint]
+    return [
+        E.project_id == row.project_id,
+        E.fingerprint.is_(None),
+        func.coalesce(E.errortype, "") == (row.errortype or ""),
+        E.message == row.message,
+    ]
+
+
 def _group_aggregate(where: list):
-    """그룹별 집계 서브쿼리. 그룹 키: (project_id, coalesce(errortype, ''), message)."""
+    """그룹별 집계 서브쿼리 (그룹 키는 _group_key)."""
     E = model.Errorlog
     return (
         select(
@@ -200,7 +230,7 @@ def _group_aggregate(where: list):
             func.max(level_order_expr(func.upper(E.level))).label("lvl"),
         )
         .where(*where)
-        .group_by(E.project_id, func.coalesce(E.errortype, ""), E.message)
+        .group_by(*_group_key())
     )
 
 
@@ -301,11 +331,7 @@ async def get_event_detail(
     row = (await conn.execute(select(E).where(E.id == error_id))).scalar_one_or_none()
     if row is None:
         return None
-    in_group = [
-        E.project_id == row.project_id,
-        func.coalesce(E.errortype, "") == (row.errortype or ""),
-        E.message == row.message,
-    ]
+    in_group = _same_group(row)
     sub = _group_aggregate(in_group).subquery()
     event = _to_event((await conn.execute(_event_select(sub))).one())
     recent = (

@@ -73,7 +73,7 @@ async def get_events(
     """
     필터/그룹핑된 로그 이벤트 목록 (커서 페이지네이션)<br>
     <br>
-    grouped: (project, errortype, message) 기준 묶음 (기본 true)<br>
+    grouped: 묶음 지문(fingerprint), 없으면 (project, errortype, message) 기준 묶음 (기본 true)<br>
     q: message/errortype 대소문자 무시 부분 일치<br>
     cursor: 이전 응답의 next_cursor<br>
     <br>
