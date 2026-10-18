@@ -92,6 +92,25 @@ async def get_events(
 
 
 @router.get(
+    "/events/{error_id}",
+    dependencies=require_login,
+    summary="로그 이벤트 상세",
+    response_model=schema.LogEventDetailResponse,
+    responses=rm([401, 403, 404]),
+)
+async def get_event_detail(request: Request, error_id: int, conn=get_db):
+    """
+    에러 한 건의 원본(raw)과 같은 그룹의 발생 통계<br>
+    <br>
+    recent_ids: 같은 그룹의 최신 ID 최대 10개 (자신 제외, 최신순)<br>
+    <br>
+    403: 프로젝트 접근 권한 없음, 404: 에러 없음
+    """
+    userid = get_userid(request)
+    return APIResponse(data=await application.get_event_detail(conn, userid, error_id))
+
+
+@router.get(
     "/{project_id}/{logfileid}",
     dependencies=require_login,
     summary="로그 파일 조회",

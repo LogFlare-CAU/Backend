@@ -6,7 +6,11 @@ from typing import Sequence
 
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.status import HTTP_400_BAD_REQUEST, HTTP_403_FORBIDDEN
+from starlette.status import (
+    HTTP_400_BAD_REQUEST,
+    HTTP_403_FORBIDDEN,
+    HTTP_404_NOT_FOUND,
+)
 
 from common.path_utils import assert_allowed_log_path
 from routes.projects import application as project_app
@@ -160,3 +164,17 @@ async def list_events(
         items = items[:limit]
         next_cursor = encode_cursor(offset + limit, ceiling)
     return schema.LogEventPage(items=items, next_cursor=next_cursor)
+
+
+async def get_event_detail(
+        conn: AsyncSession, userid: int, error_id: int
+) -> schema.LogEventDetail:
+    detail = await service.get_event_detail(conn, error_id)
+    if detail is None:
+        raise HTTPException(HTTP_404_NOT_FOUND, detail="Error not found")
+    accessible = [p.id for p in await project_app.get_projects(conn, userid)]
+    if detail.project_id not in accessible:
+        raise HTTPException(
+            HTTP_403_FORBIDDEN, detail="You do not have access to this project"
+        )
+    return detail

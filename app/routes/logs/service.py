@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Sequence
 
-from sqlalchemy import case, func, or_, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.sortingutils import LEVEL_ORDER, get_sort_order, level_order_expr
@@ -276,3 +276,69 @@ async def list_events(
         )
         for r in (await conn.execute(stmt)).all()
     ]
+
+
+RECENT_IDS_LIMIT = 10
+
+
+async def get_event_detail(
+        conn: AsyncSession, error_id: int
+) -> schema.LogEventDetail | None:
+    """에러 한 건과 그가 속한 그룹(project, errortype, message)의 집계.
+
+    id/raw 는 요청한 행의 값, level 은 그룹 최고 레벨, errortype/logfile 은
+    그룹의 최신 행 기준이다.
+    """
+    E = model.Errorlog
+    row = (await conn.execute(select(E).where(E.id == error_id))).scalar_one_or_none()
+    if row is None:
+        return None
+    in_group = and_(
+        E.project_id == row.project_id,
+        func.coalesce(E.errortype, "") == (row.errortype or ""),
+        E.message == row.message,
+    )
+    order = level_order_expr(func.upper(E.level))
+    agg = (
+        await conn.execute(
+            select(
+                func.count(),
+                func.min(E.timestamp),
+                func.max(E.timestamp),
+                func.max(order),
+                func.max(E.id),
+            ).where(in_group)
+        )
+    ).one()
+    occ, first_seen, last_seen, lvl, latest_id = agg
+    latest = (
+        await conn.execute(
+            select(E.errortype, E.logfile_id, func.upper(E.level), LogFile.file_name)
+            .outerjoin(LogFile, LogFile.id == E.logfile_id)
+            .where(E.id == latest_id)
+        )
+    ).one()
+    recent = (
+        await conn.execute(
+            select(E.id)
+            .where(in_group, E.id != error_id)
+            .order_by(E.id.desc())
+            .limit(RECENT_IDS_LIMIT)
+        )
+    ).scalars().all()
+    names = {i: lv.value for i, lv in enumerate(LEVEL_ORDER, start=1)}
+    return schema.LogEventDetail(
+        id=row.id,
+        project_id=row.project_id,
+        logfile_id=latest[1],
+        logfile_name=latest[3],
+        errortype=latest[0],
+        message=row.message,
+        level=names.get(lvl, latest[2]),
+        timestamp=last_seen,
+        occurrences=occ,
+        first_seen=first_seen,
+        last_seen=last_seen,
+        raw=row.raw,
+        recent_ids=list(recent),
+    )

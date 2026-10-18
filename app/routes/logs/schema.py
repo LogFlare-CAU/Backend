@@ -57,6 +57,17 @@ class LogEvent(BaseModel):
     last_seen: datetime
 
 
+class LogEventDetail(LogEvent):
+    raw: str | None = Field(None, description="이 에러의 원본 로그 페이로드")
+    recent_ids: list[int] = Field(
+        default_factory=list, description="같은 그룹의 최신 ID 최대 10개 (자신 제외, 최신순)"
+    )
+
+
+class LogEventDetailResponse(APIResponse[LogEventDetail]):
+    pass
+
+
 class LogEventPage(BaseModel):
     items: list[LogEvent]
     next_cursor: str | None = None
