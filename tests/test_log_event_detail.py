@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from common.sqlsession import async_session
 from routes.logs.model import Errorlog
+from sqlalchemy import select
 
 pytestmark = pytest.mark.asyncio
 
@@ -54,6 +55,46 @@ async def test_event_detail_raw_and_group(client, admin_token, project_with_key)
     d = res.json()["data"]
     assert d["raw"] == "raw0" and d["occurrences"] == 13
     assert ids[0] not in d["recent_ids"] and d["recent_ids"][0] == ids[-1]
+
+
+async def test_event_detail_row_fields_from_requested_row(
+    client, admin_token, project_with_key, sample_logfile
+):
+    pid = project_with_key[2]
+    for name in ("a.log", "b.log"):
+        r = await client.post(
+            f"/project/{pid}/logfile",
+            headers=_auth(admin_token),
+            json={"name": name, "path": str(sample_logfile)},
+        )
+        assert r.status_code == 200, r.text
+    async with async_session() as s:
+        from routes.projects.model import LogFile
+        files = {
+            f.file_name: f.id
+            for f in (await s.execute(select(LogFile))).scalars().all()
+        }
+    now = datetime.now(UTC).replace(tzinfo=None)
+    async with async_session() as s:
+        old = Errorlog(project_id=pid, errortype="E", message="grp", level="warning",
+                       logfile_id=files["a.log"], timestamp=now - timedelta(hours=2))
+        new = Errorlog(project_id=pid, errortype="E", message="grp", level="CRITICAL",
+                       logfile_id=files["b.log"], timestamp=now)
+        s.add_all([old, new])
+        await s.commit()
+        await s.refresh(old)
+        await s.refresh(new)
+        old_id, new_id, old_ts, new_ts = old.id, new.id, old.timestamp, new.timestamp
+    d = (await client.get(f"/log/events/{old_id}", headers=_auth(admin_token))).json()["data"]
+    assert d["id"] == old_id
+    assert d["logfile_id"] == files["a.log"] and d["logfile_name"] == "a.log"
+    assert d["row_level"] == "WARNING"
+    assert d["occurred_at"] == old_ts.isoformat()
+    assert d["level"] == "CRITICAL"
+    assert d["occurrences"] == 2
+    assert d["timestamp"] == d["last_seen"] == new_ts.isoformat()
+    d = (await client.get(f"/log/events/{new_id}", headers=_auth(admin_token))).json()["data"]
+    assert d["logfile_name"] == "b.log" and d["row_level"] == "CRITICAL"
 
 
 async def test_event_detail_404(client, admin_token):

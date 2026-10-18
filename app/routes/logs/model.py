@@ -13,6 +13,10 @@ class Errorlog(Base):
         Index("ix_errorlogs_level", "level"),
     )
 
+    # raw 는 상세 엔드포인트(/log/events/{id})에서만 노출한다.
+    # project/logfile 관계 객체는 GET /log/error 응답(DTO)에 싣지 않는다.
+    __serialize_exclude_keys__ = {"raw", "project", "logfile"}
+
     id = Column(Integer, primary_key=True, autoincrement=True, comment="ID")
     project_id = Column(
         Integer,

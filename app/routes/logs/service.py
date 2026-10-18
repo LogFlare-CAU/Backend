@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Sequence
 
 from sqlalchemy import case, func, or_, select
@@ -140,6 +140,13 @@ async def project_summaries(
     return result
 
 
+def to_naive_utc(dt: datetime | None) -> datetime | None:
+    """오프셋이 있는 datetime 을 naive UTC 로 변환 (DB 는 naive UTC 저장)."""
+    if dt is not None and dt.tzinfo is not None:
+        return dt.astimezone(UTC).replace(tzinfo=None)
+    return dt
+
+
 @dataclass
 class EventFilters:
     min_level: Level | None = None
@@ -162,17 +169,19 @@ def _event_conditions(
     if f.logfile_id is not None:
         conds.append(E.logfile_id == f.logfile_id)
     if f.since is not None:
-        conds.append(E.timestamp >= f.since)
+        conds.append(E.timestamp >= to_naive_utc(f.since))
     if f.until is not None:
-        conds.append(E.timestamp <= f.until)
+        conds.append(E.timestamp <= to_naive_utc(f.until))
     if ceiling is not None:
         conds.append(E.timestamp <= ceiling)
     if f.q:
-        pattern = f"%{f.q.lower()}%"
+        needle = f.q.lower()
         conds.append(
             or_(
-                func.lower(E.message).like(pattern),
-                func.lower(func.coalesce(E.errortype, "")).like(pattern),
+                func.lower(E.message).contains(needle, autoescape=True),
+                func.lower(func.coalesce(E.errortype, "")).contains(
+                    needle, autoescape=True
+                ),
             )
         )
     return conds
@@ -295,7 +304,8 @@ async def get_event_detail(
 ) -> schema.LogEventDetail | None:
     """에러 한 건과 그가 속한 그룹의 집계 (list_events 와 같은 집계 사용).
 
-    id/raw 는 요청한 행의 값이다.
+    id/raw/occurred_at/row_level/logfile_* 는 요청한 행의 값이고,
+    occurrences/first_seen/last_seen/level 은 그룹 전체의 값이다.
     """
     E = model.Errorlog
     row = (await conn.execute(select(E).where(E.id == error_id))).scalar_one_or_none()
@@ -317,7 +327,14 @@ async def get_event_detail(
         )
     ).scalars().all()
     return schema.LogEventDetail(
-        **{**event.model_dump(), "id": row.id},
+        **{
+            **event.model_dump(),
+            "id": row.id,
+            "logfile_id": row.logfile_id,
+            "logfile_name": row.logfile.file_name if row.logfile else None,
+        },
+        occurred_at=row.timestamp,
+        row_level=(row.level or "").upper(),
         raw=row.raw,
         recent_ids=list(recent),
     )

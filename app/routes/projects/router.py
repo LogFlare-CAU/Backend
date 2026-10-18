@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
+from starlette.status import HTTP_403_FORBIDDEN
 
 from common.schema import APIResponse
 from common.schema import response_maker as rm
@@ -92,8 +93,13 @@ async def rotate_project_token(
 async def get_project_token(
         request: Request, projectid: int, conn=get_db
 ) -> APIResponse:
-    """기존 프로젝트의 ProjectKey를 조회합니다."""
+    """기존 프로젝트의 ProjectKey를 조회합니다. 프로젝트 접근 권한이 필요합니다."""
     project = await service.get_project(conn, projectid)
+    accessible = await application.get_projects(conn, get_userid(request))
+    if projectid not in [p.id for p in accessible]:
+        raise HTTPException(
+            HTTP_403_FORBIDDEN, detail="You do not have access to this project"
+        )
     payload = {c.name: getattr(project, c.name) for c in project.__table__.columns}
     return APIResponse(data=payload)
 

@@ -173,3 +173,25 @@ async def test_read_logfile_entries(
     entries = res.json()["data"]
     assert len(entries) >= 2
     assert "INFO | hello" in entries[0]
+
+
+@pytest.mark.asyncio
+async def test_get_errors_item_key_set(client, admin_token, project_with_key):
+    pid = project_with_key[2]
+    from common.sqlsession import async_session
+    from routes.logs.model import Errorlog
+    async with async_session() as s:
+        s.add(Errorlog(project_id=pid, errortype="T", level="ERROR",
+                       message="m", raw="SECRET RAW"))
+        await s.commit()
+    res = await client.get(
+        "/log/error", headers={"Authorization": f"Bearer {admin_token}"}
+    )
+    assert res.status_code == 200, res.text
+    items = res.json()["data"]
+    assert items
+    for item in items:
+        assert set(item) == {
+            "id", "project_id", "errortype", "message", "level",
+            "timestamp", "logfile_id",
+        }

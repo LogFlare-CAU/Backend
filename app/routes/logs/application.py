@@ -131,7 +131,7 @@ def decode_cursor(cursor: str) -> tuple[int, datetime]:
         offset, ceiling = data["o"], datetime.fromisoformat(data["t"])
         if not isinstance(offset, int) or isinstance(offset, bool) or offset < 0:
             raise ValueError("bad offset")
-        return offset, ceiling.replace(tzinfo=None)
+        return offset, service.to_naive_utc(ceiling)
     except (ValueError, KeyError, TypeError):
         raise HTTPException(HTTP_400_BAD_REQUEST, detail="Invalid cursor") from None
 

@@ -183,3 +183,33 @@ async def test_events_forbidden_project(client, admin_token, project_with_key, p
     assert res.status_code == 403
     data = await _get(client, token)
     assert data["items"] == []
+
+
+async def test_events_since_respects_offset(client, admin_token, project_with_key):
+    pid = project_with_key[2]
+    async with async_session() as s:
+        s.add(Errorlog(project_id=pid, errortype="T", level="ERROR", message="tz",
+                       timestamp=datetime(2026, 1, 1, 3, 0, 0)))
+        await s.commit()
+    # 11:00+09:00 == 02:00Z -> 03:00Z row included
+    data = await _get(client, admin_token, "since=2026-01-01T11:00:00%2B09:00")
+    assert [i["message"] for i in data["items"]] == ["tz"]
+    # 13:00+09:00 == 04:00Z -> excluded
+    data = await _get(client, admin_token, "since=2026-01-01T13:00:00%2B09:00")
+    assert data["items"] == []
+    # until 11:00+09:00 == 02:00Z -> excluded; 13:00+09:00 -> included
+    data = await _get(client, admin_token, "until=2026-01-01T11:00:00%2B09:00")
+    assert data["items"] == []
+    data = await _get(client, admin_token, "until=2026-01-01T13:00:00%2B09:00")
+    assert len(data["items"]) == 1
+
+
+async def test_events_q_escapes_like_wildcards(client, admin_token, project_with_key):
+    pid = project_with_key[2]
+    await _insert(pid, "user_id missing", None)
+    await _insert(pid, "userXid missing", None)
+    await _insert(pid, "100% done", None)
+    data = await _get(client, admin_token, "q=user_id")
+    assert [i["message"] for i in data["items"]] == ["user_id missing"]
+    data = await _get(client, admin_token, "q=%25")
+    assert [i["message"] for i in data["items"]] == ["100% done"]

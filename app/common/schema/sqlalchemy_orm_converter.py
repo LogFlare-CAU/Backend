@@ -80,11 +80,13 @@ def sqlalchemy_to_pydantic_with_comments(
     skip_sensitive: bool = True,  # ← 민감 필드 DTO에서 아예 제거
 ) -> Type[BaseModel]:
     fields: dict[str, tuple[Any, Any]] = {}
+    # 모델이 직렬화에서 제외하는 키는 응답 DTO 에서도 제외한다.
+    excluded = {k.lower() for k in getattr(sa_model, "__serialize_exclude_keys__", ())}
 
     # --- 컬럼 ---
     for col in sa_model.__table__.columns:  # type: ignore[attr-defined]
         cname = col.name
-        if skip_sensitive and is_sensitive(cname):
+        if (skip_sensitive and is_sensitive(cname)) or cname.lower() in excluded:
             # DTO에 포함하지 않음
             continue
 
@@ -99,6 +101,8 @@ def sqlalchemy_to_pydantic_with_comments(
     # --- 관계 ---
     if depth < max_depth:
         for rel in sa_model.__mapper__.relationships:
+            if rel.key.lower() in excluded:
+                continue
             target_model = rel.entity.entity
             target_dto = get_or_create_dto(
                 target_model,
