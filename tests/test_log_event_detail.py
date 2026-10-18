@@ -31,13 +31,18 @@ async def _insert(project_id, message="m", errortype="T", level="ERROR",
 
 async def test_event_detail_raw_and_group(client, admin_token, project_with_key):
     pid = project_with_key[2]
-    ids = [await _insert(pid, "boom", "E", "WARNING", 50 - i * 2, raw=f"raw{i}")
+    ids = [await _insert(pid, "boom", "E", "WARNING" if i != 6 else "ERROR",
+                         50 - i * 2, raw=f"raw{i}")
            for i in range(13)]
     await _insert(pid, "other", "E")
     res = await client.get(f"/log/events/{ids[-1]}", headers=_auth(admin_token))
     assert res.status_code == 200, res.text
     d = res.json()["data"]
     assert d["id"] == ids[-1]
+    assert d["level"] == "ERROR"
+    listed = (await client.get("/log/events", headers=_auth(admin_token))).json()["data"]
+    item = next(i for i in listed["items"] if i["message"] == "boom")
+    assert {k: d[k] for k in item} == item
     assert d["raw"] == "raw12"
     assert d["occurrences"] == 13
     assert d["first_seen"] < d["last_seen"]
