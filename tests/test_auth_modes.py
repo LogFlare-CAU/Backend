@@ -41,15 +41,29 @@ async def _modes(client) -> list[str]:
     return body["data"]["modes"]
 
 
-async def test_default_is_password_only(client, full_access):
+async def test_unset_without_access_config_is_password_only(client, monkeypatch):
+    for name in ("TEAM_DOMAIN", "AUD", "USERS"):
+        monkeypatch.delenv(f"LOGFLARE_ACCESS_{name}", raising=False)
     assert await _modes(client) == ["password"]
     assert (await client.post("/user/auth", json=PW)).status_code == 200
     assert (await client.post("/user/auth/access", headers=_hdr(make_jwt()))).status_code == 404
 
 
-async def test_empty_value_is_default(client, monkeypatch):
+async def test_unset_with_access_config_is_legacy_both(client, full_access):
+    assert await _modes(client) == ["password", "access"]
+    assert (await client.post("/user/auth", json=PW)).status_code == 200
+    assert (await client.post("/user/auth/access", headers=_hdr(make_jwt()))).status_code == 200
+
+
+async def test_blank_value_is_default(client, full_access, monkeypatch):
     monkeypatch.setenv("LOGFLARE_AUTH_MODES", "  ")
+    assert await _modes(client) == ["password", "access"]
+
+
+async def test_explicit_password_turns_access_off(client, full_access, monkeypatch):
+    monkeypatch.setenv("LOGFLARE_AUTH_MODES", "password")
     assert await _modes(client) == ["password"]
+    assert (await client.post("/user/auth/access", headers=_hdr(make_jwt()))).status_code == 404
 
 
 async def test_access_only(client, full_access, monkeypatch):
@@ -105,9 +119,11 @@ async def test_unknown_word_warned_once_per_process(client, monkeypatch, caplog)
 def test_startup_warns_access_config_without_mode(full_access, monkeypatch, caplog):
     from common.access import warn_auth_mode_mismatch
 
+    monkeypatch.setenv("LOGFLARE_AUTH_MODES", "password")
     with caplog.at_level("WARNING", logger="common.access"):
         warn_auth_mode_mismatch()
     assert "Access 로그인이 꺼져 있습니다" in caplog.text
+    assert "LOGFLARE_AUTH_MODES=password,access" in caplog.text
     assert AUD not in caplog.text and TEAM not in caplog.text
 
 
@@ -120,6 +136,26 @@ def test_startup_warns_access_mode_without_config(monkeypatch, caplog):
     with caplog.at_level("WARNING", logger="common.access"):
         warn_auth_mode_mismatch()
     assert "Access 설정이 덜 채워져" in caplog.text
+
+
+def test_startup_quiet_when_unset(full_access, caplog):
+    from common.access import warn_auth_mode_mismatch
+
+    with caplog.at_level("WARNING", logger="common.access"):
+        warn_auth_mode_mismatch()
+    assert caplog.text == ""
+
+
+def test_startup_errors_when_no_known_mode(monkeypatch, caplog):
+    from common.access import effective_auth_modes, warn_auth_mode_mismatch
+
+    monkeypatch.setenv("LOGFLARE_AUTH_MODES", "sms")
+    with caplog.at_level("WARNING", logger="common.access"):
+        warn_auth_mode_mismatch()
+    errors = [r for r in caplog.records if r.levelname == "ERROR"]
+    assert len(errors) == 1
+    assert "쓸 수 있는 로그인 방식이 없습니다" in errors[0].getMessage()
+    assert effective_auth_modes() == []
 
 
 def test_startup_quiet_when_consistent(full_access, monkeypatch, caplog):

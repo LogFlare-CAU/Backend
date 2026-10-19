@@ -54,10 +54,11 @@ KNOWN_AUTH_MODES = ("password", "access")
 _warned_unknown: set[str] = set()
 
 
-def _listed_modes() -> set[str]:
+def _listed_modes() -> tuple[bool, set[str]]:
+    """(명시 여부, 목록). 없거나 공백이면 예전 동작: password 항상, access 는 (설정이 있으면) 켬."""
     raw = str(getenvval("LOGFLARE_AUTH_MODES", "") or "").strip()
     if not raw:
-        return {"password"}
+        return False, {"password", "access"}
     wanted: set[str] = set()
     for word in raw.split(","):
         word = word.strip().lower()
@@ -68,15 +69,26 @@ def _listed_modes() -> set[str]:
         elif word not in _warned_unknown:
             _warned_unknown.add(word)
             logger.warning("LOGFLARE_AUTH_MODES: unknown mode ignored: %s", word)
-    return wanted
+    return True, wanted
 
 
 def warn_auth_mode_mismatch() -> None:
-    """시작 시 한 번: Access 설정과 LOGFLARE_AUTH_MODES 가 어긋나 Access 로그인이 꺼져 있으면 알린다."""
-    listed = _listed_modes()
+    """시작 시 한 번: 명시한 LOGFLARE_AUTH_MODES 가 Access 설정과 어긋나거나 쓸 수 있는 방식이 없으면 알린다."""
+    explicit, listed = _listed_modes()
+    if not explicit:
+        return
+    if not listed:
+        logger.error(
+            "LOGFLARE_AUTH_MODES 에 쓸 수 있는 로그인 방식이 없습니다 (password, access 중에서 고르세요). "
+            "새 로그인이 모두 막힙니다"
+        )
+        return
     configured = load_access_config() is not None
     if configured and "access" not in listed:
-        logger.warning("Access 설정은 있으나 LOGFLARE_AUTH_MODES 에 access 가 없어 Access 로그인이 꺼져 있습니다")
+        logger.warning(
+            "Access 설정은 있으나 LOGFLARE_AUTH_MODES 에 access 가 없어 Access 로그인이 꺼져 있습니다 "
+            "(켜려면 LOGFLARE_AUTH_MODES=password,access)"
+        )
     elif not configured and "access" in listed:
         logger.warning("LOGFLARE_AUTH_MODES 에 access 가 있으나 Access 설정이 덜 채워져 꺼져 있습니다")
 
@@ -84,11 +96,13 @@ def warn_auth_mode_mismatch() -> None:
 def effective_auth_modes() -> list[str]:
     """LOGFLARE_AUTH_MODES 중 실제로 켜진 로그인 방식 (["password","access"] 순서). 요청 시점에 읽는다.
 
-    비어 있으면 password 만. access 는 Access 설정 세 가지가 모두 있을 때만 유효하다.
+    미설정/공백이면 예전 동작(password 항상, Access 설정이 있으면 access 도). 명시하면 그 목록만.
+    access 는 Access 설정 세 가지가 모두 있을 때만 유효하다.
     """
-    wanted = _listed_modes()
+    explicit, wanted = _listed_modes()
     if "access" in wanted and load_access_config() is None:
-        logger.debug("LOGFLARE_AUTH_MODES lists access but Access settings are incomplete")
+        if explicit:
+            logger.debug("LOGFLARE_AUTH_MODES lists access but Access settings are incomplete")
         wanted.discard("access")
     return [m for m in KNOWN_AUTH_MODES if m in wanted]
 
