@@ -13,3 +13,4 @@ pytest-asyncio==1.4.0
 ruff==0.15.21
 greenlet==3.5.3
 cryptography==50.0.2
+segno==1.6.6

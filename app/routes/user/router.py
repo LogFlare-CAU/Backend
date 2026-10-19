@@ -7,7 +7,7 @@ from common.client_ip import get_client_ip
 from common.sqlsession import get_db
 
 from . import application, schema, service
-from .authenticate import get_token_idx, get_userid, require_login, require_moderator
+from .authenticate import get_token_idx, get_userid, require_admin, require_login, require_moderator
 
 router = APIRouter(prefix="/user", tags=["user"])
 
@@ -60,6 +60,26 @@ async def get_current_user(request: Request, conn=get_db):
     userid = get_userid(request)
     res = await service.get_user_byid(conn, userid)
     return APIResponse(data=dict(res))
+
+
+@router.get(
+    "/access-qr",
+    response_model=APIResponse[schema.AccessQr],
+    responses=r_make([401, 403, 404]),
+    dependencies=require_admin,
+)
+async def get_access_qr(request: Request, conn=get_db):
+    """
+    앱의 CF Access 로그인용 QR 을 반환합니다. 관리자(100)만 볼 수 있습니다.<br>
+    svg 에만 앱 전용 서비스 토큰 secret 이 담기며, 응답은 캐시되지 않습니다.<br>
+    <br>
+    401: 인증 실패<br>
+    403: 관리자가 아님<br>
+    404: 설정 없음 (data.reason = qr_unconfigured, data.missing)<br>
+    503: QR 라이브러리 없음 (data.reason = qr_lib_missing)<br>
+    """
+    admin = request.state.user
+    return await application.build_access_qr(conn, admin.username)
 
 
 @router.get("/auth/modes", response_model=APIResponse[schema.AuthModes])

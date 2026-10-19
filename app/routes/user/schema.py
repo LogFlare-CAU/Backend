@@ -65,5 +65,14 @@ class AuthModes(BaseModel):
     modes: list[str] = Field(..., description='서버가 허용하는 로그인 방식 ("password", "access" 순서)')
 
 
+class AccessQr(BaseModel):
+    svg: str = Field(..., description="앱 로그인용 QR (SVG 문자열). 앱 전용 서비스 토큰 secret 은 여기에만 담긴다")
+    server: str = Field(..., description="LogFlare 공개 주소")
+    clientId: str = Field(..., description="서비스 토큰 client ID 앞 4·뒤 4 글자")
+    mapped: bool = Field(..., description="이 client ID 가 LOGFLARE_ACCESS_USERS 에 있고 그 사용자가 DB 에 있는가")
+    mappedReason: str | None = Field(None, description='mapped 가 false 일 때: "not_in_map" | "user_missing"')
+    accessEnabled: bool = Field(..., description="Access 로그인이 켜져 있는가")
+
+
 class AccessAuthParams(BaseModel):
     keep_logged_in: bool = Field(False, description="로그인 상태 유지 여부")

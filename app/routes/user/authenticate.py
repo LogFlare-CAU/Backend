@@ -108,7 +108,22 @@ async def _require_moderator(
     return None
 
 
+async def _require_admin(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Security(bearer_scheme),
+    conn: AsyncSession = Depends(_get_db),
+) -> None:
+    """정확히 ADMINISTRATOR(100) 만. DB 의 현재 permission 기준(JWT perm 클레임 아님)."""
+    await _require_login(request, credentials, conn)
+    user = getattr(request.state, "user", None)
+    perm = int(getattr(user, "permission", 0) if user is not None else 0)
+    if perm < int(Permissions.ADMINISTRATOR):
+        raise HTTPException(HTTP_403_FORBIDDEN, "Insufficient permission")
+    return None
+
+
 require_moderator = [Depends(_require_moderator)]
+require_admin = [Depends(_require_admin)]
 require_login = [Depends(_require_login)]
 
 
