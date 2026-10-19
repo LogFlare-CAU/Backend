@@ -115,7 +115,7 @@ async def test_no_secret_in_logs(client, admin_token, qr_env, caplog):
     assert res.status_code == 200
     assert SECRET not in caplog.text
     assert CLIENT_ID not in caplog.text
-    assert "admin" in caplog.text  # 감사 로그: 본 관리자 이름
+    assert "access QR viewed by admin" in caplog.text  # 감사 로그: 본 관리자 이름
 
 
 async def test_unmapped_flags(client, admin_token, qr_env, monkeypatch):
@@ -176,6 +176,14 @@ async def test_unconfigured_404(client, admin_token, qr_env, monkeypatch, tmp_pa
     assert res.headers["cache-control"] == "no-store"
     # 서버는 정상: 비밀번호 로그인 가능
     assert (await client.post("/user/auth", json={"username": "admin", "password": "adminpass1"})).status_code == 200
+
+
+@pytest.mark.parametrize("url", ["http://logflare.code0987.me", "logflare.code0987.me", "https://"])
+async def test_non_https_public_url_is_unconfigured(client, admin_token, qr_env, monkeypatch, url):
+    monkeypatch.setenv("LOGFLARE_PUBLIC_URL", url)
+    res = await client.get("/user/access-qr", headers=_auth(admin_token))
+    assert res.status_code == 404
+    assert res.json()["data"] == {"reason": "qr_unconfigured", "missing": ["LOGFLARE_PUBLIC_URL"]}
 
 
 async def test_unconfigured_hidden_from_non_admin(client, moderator, monkeypatch):

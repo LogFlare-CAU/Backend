@@ -79,13 +79,12 @@ async def build_access_qr(conn: AsyncSession, admin_username: str) -> JSONRespon
     token_file = str(getenvval("LOGFLARE_ACCESS_QR_TOKEN_FILE", "") or "").strip()
     token = load_qr_token(token_file)
     missing = []
-    if not server:
+    if not server.lower().startswith("https://") or len(server) <= len("https://"):
         missing.append("LOGFLARE_PUBLIC_URL")
     if token is None:
         missing.append("LOGFLARE_ACCESS_QR_TOKEN_FILE")
-    if missing:
+    if missing or token is None:
         return _qr_response(HTTP_404_NOT_FOUND, "QR is not configured", {"reason": "qr_unconfigured", "missing": missing})
-    assert token is not None
     client_id, secret = token
     try:
         svg = qr_svg(qr_payload(server, client_id, secret))

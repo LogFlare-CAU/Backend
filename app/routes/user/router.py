@@ -65,7 +65,7 @@ async def get_current_user(request: Request, conn=get_db):
 @router.get(
     "/access-qr",
     response_model=APIResponse[schema.AccessQr],
-    responses=r_make([401, 403, 404]),
+    responses=r_make([400, 401, 403, 404]),  # 503(qr_lib_missing)은 response_maker 에 키가 없어 docstring 으로만 적는다
     dependencies=require_admin,
 )
 async def get_access_qr(request: Request, conn=get_db):

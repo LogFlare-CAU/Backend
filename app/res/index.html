@@ -91,7 +91,8 @@ dialog#qrd { max-width:min(92vw,420px); border:1px solid var(--color-border); bo
     return j.data;
   }
 
-  function closeQr() { const d = $('qrd'); if (d.open) d.close(); $('qrbox').replaceChildren(); $('qrinfo').textContent = ''; $('qrwarn').textContent = ''; }
+  let qrSeq = 0;
+  function closeQr() { qrSeq++; const d = $('qrd'); if (d.open) d.close(); $('qrbox').replaceChildren(); $('qrinfo').textContent = ''; $('qrwarn').textContent = ''; }
   function showLogin() { closeQr(); $('qrb').hidden = true; store.set(null); seq++; $('list').replaceChildren(); $('proj').length = 1; $('more').hidden = true; $('app').hidden = true; $('login').hidden = false; }
   function showApp() { $('login').hidden = true; $('app').hidden = false; }
   async function guard(fn) {
@@ -173,14 +174,29 @@ dialog#qrd { max-width:min(92vw,420px); border:1px solid var(--color-border); bo
   }
 
   // 서버가 준 SVG 문자열은 innerHTML 이 아니라 DOMParser 로 파싱해 svg 요소만 가져온다.
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  function safeSvg(root, doc) {
+    if (!root || root.localName !== 'svg' || root.namespaceURI !== SVG_NS || doc.getElementsByTagName('parsererror').length) return false;
+    for (const n of [root, ...root.querySelectorAll('*')]) {
+      if (n.namespaceURI !== SVG_NS || /^(script|foreignobject)$/i.test(n.localName)) return false;
+      for (const a of n.attributes) {
+        if (/^on/i.test(a.name)) return false;
+        if (/^(href|xlink:href)$/i.test(a.name) && /^\s*javascript:/i.test(a.value)) return false;
+      }
+    }
+    return true;
+  }
+
   async function openQr() {
+    const my = ++qrSeq;
     $('qrbox').replaceChildren(); $('qrinfo').textContent = ''; $('qrwarn').textContent = '';
     if (!$('qrd').open) $('qrd').showModal();
     try {
       const d = await api('user/access-qr');
+      if (my !== qrSeq || !$('qrd').open) return;
       const doc = new DOMParser().parseFromString(d.svg, 'image/svg+xml');
       const root = doc.documentElement;
-      if (!root || root.localName !== 'svg' || doc.getElementsByTagName('parsererror').length) throw new Error('QR 을 표시할 수 없습니다');
+      if (!safeSvg(root, doc)) throw new Error('QR 을 표시할 수 없습니다');
       $('qrbox').append(document.importNode(root, true));
       $('qrinfo').textContent = d.server + ' · ' + d.clientId;
       const w = [];
@@ -188,6 +204,7 @@ dialog#qrd { max-width:min(92vw,420px); border:1px solid var(--color-border); bo
       if (!d.accessEnabled) w.push('Access 로그인이 꺼져 있어 앱으로 찍어도 로그인되지 않습니다.');
       $('qrwarn').textContent = w.join(' ');
     } catch (e) {
+      if (my !== qrSeq || !$('qrd').open) return;
       if (e instanceof AuthError) return showLogin();
       const dd = e.data || {};
       if (e.status === 404 && dd.reason === 'qr_unconfigured') $('qrwarn').textContent = 'QR 기능이 꺼져 있습니다. 서버 설정이 빠졌습니다: ' + (dd.missing || []).join(', ');
