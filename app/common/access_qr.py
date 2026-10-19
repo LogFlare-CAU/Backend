@@ -5,6 +5,7 @@ segno 는 QR 을 만들 때만 가져온다(옛 이미지로 새 코드가 떠�
 """
 from __future__ import annotations
 
+import io
 import json
 
 
@@ -47,7 +48,10 @@ def qr_svg(payload: str) -> str:
     except ImportError:
         raise QrLibMissing() from None
     qr = segno.make(payload, error="m")
-    return qr.svg_inline(border=2, scale=6, dark="#191F28", light="#FFFFFF")
+    buf = io.BytesIO()
+    # svg_inline 은 xmlns 를 빼므로 save(svgns=True) 로 SVG 네임스페이스를 붙인다 (웹 화면이 image/svg+xml 로 파싱)
+    qr.save(buf, kind="svg", xmldecl=False, svgns=True, nl=False, border=2, scale=6, dark="#191F28", light="#FFFFFF")
+    return buf.getvalue().decode("utf-8")
 
 
 def mask_client_id(client_id: str) -> str:

@@ -73,6 +73,18 @@ def test_qr_svg_is_svg():
     assert svg.startswith("<svg") and "<?xml" not in svg and "#191F28".lower() in svg.lower()
 
 
+def test_qr_svg_has_svg_namespace():
+    """웹 화면이 image/svg+xml 로 파싱하므로 루트에 SVG 네임스페이스가 있어야 한다."""
+    import xml.etree.ElementTree as ET
+
+    from common.access_qr import qr_svg
+
+    root = ET.fromstring(qr_svg('{"v":1}'))
+    assert root.tag == "{http://www.w3.org/2000/svg}svg"
+    tags = {el.tag.lower() for el in root.iter()}
+    assert not any(t.endswith("script") or t.endswith("foreignobject") for t in tags)
+
+
 def test_mask_client_id():
     from common.access_qr import mask_client_id
 
