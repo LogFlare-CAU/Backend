@@ -5,12 +5,16 @@
 """
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 import jwt
 from jwt import PyJWKClient
 
 from .env_utils import getenvval
+
+
+logger = logging.getLogger(__name__)
 
 
 class AccessError(Exception):
@@ -50,7 +54,7 @@ _jwk_clients: dict[str, PyJWKClient] = {}
 def _get_jwk_client(team_domain: str) -> PyJWKClient:
     client = _jwk_clients.get(team_domain)
     if client is None:
-        client = PyJWKClient(f"https://{team_domain}/cdn-cgi/access/certs", cache_keys=True)
+        client = PyJWKClient(f"https://{team_domain}/cdn-cgi/access/certs", cache_keys=True, timeout=5)
         _jwk_clients[team_domain] = client
     return client
 
@@ -66,9 +70,11 @@ def verify_access_jwt(token: str, cfg: AccessConfig, jwk_client=None) -> str:
             algorithms=["RS256"],
             audience=cfg.aud,
             issuer=f"https://{cfg.team_domain}",
+            leeway=30,
             options={"require": ["exp", "aud", "iss"]},
         )
     except Exception as exc:  # 서명·클레임·JWKS 조회 실패 모두 같은 실패로
+        logger.warning("Access JWT verification failed: %s", type(exc).__name__)
         raise AccessError("invalid access token") from exc
     identity = claims.get("email") or claims.get("common_name")
     if not isinstance(identity, str) or not identity.strip():

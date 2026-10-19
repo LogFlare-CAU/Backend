@@ -95,7 +95,7 @@ async def test_aud_as_string_and_keep_logged_in(client, access_env):
         make_jwt(key=_OTHER_KEY),
         make_jwt(aud=["other"]),
         make_jwt(iss="https://evil.cloudflareaccess.com"),
-        make_jwt(exp=int(time.time()) - 10),
+        make_jwt(exp=int(time.time()) - 120),
         make_jwt(common_name="unmapped.access"),
         "garbage",
     ],
@@ -155,3 +155,40 @@ def test_parse_users():
     from common.access import parse_users
 
     assert parse_users(" A.access = admin ,Bob@X.com=bob,,bad") == {"a.access": "admin", "bob@x.com": "bob"}
+
+
+async def test_missing_exp_is_401(client, access_env):
+    res = await client.post("/user/auth/access", headers=_hdr(make_jwt(exp=None)))
+    assert res.status_code == 401
+
+
+async def test_header_wins_over_cookie(client, access_env, monkeypatch):
+    monkeypatch.setenv("LOGFLARE_ACCESS_USERS", f"{SERVICE}=admin,other.access=nobody")
+    client.cookies.set("CF_Authorization", make_jwt(common_name="other.access"))
+    res = await client.post("/user/auth/access", headers=_hdr(make_jwt()))
+    assert res.status_code == 200, res.text
+
+
+async def test_success_resets_rate_limit(client, access_env):
+    for _ in range(4):
+        assert (await client.post("/user/auth/access", headers=_hdr("garbage"))).status_code == 401
+    assert (await client.post("/user/auth/access", headers=_hdr(make_jwt()))).status_code == 200
+    for _ in range(4):
+        assert (await client.post("/user/auth/access", headers=_hdr("garbage"))).status_code == 401
+
+
+def test_verify_with_injected_jwk_client():
+    from common.access import AccessConfig, AccessError, verify_access_jwt
+
+    cfg = AccessConfig(TEAM, AUD, {SERVICE: "admin"})
+    assert verify_access_jwt(make_jwt(), cfg, FakeJwkClient()) == SERVICE
+    with pytest.raises(AccessError):
+        verify_access_jwt(make_jwt(key=_OTHER_KEY), cfg, FakeJwkClient())
+
+
+async def test_failure_logs_class_name_only(client, access_env, caplog):
+    tok = make_jwt(aud=["other"])
+    with caplog.at_level("WARNING", logger="common.access"):
+        await client.post("/user/auth/access", headers=_hdr(tok))
+    assert "InvalidAudienceError" in caplog.text
+    assert tok not in caplog.text

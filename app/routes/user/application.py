@@ -1,5 +1,6 @@
 from fastapi import HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.concurrency import run_in_threadpool
 from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_404_NOT_FOUND
 
 from common.access import AccessError, load_access_config, verify_access_jwt
@@ -40,7 +41,8 @@ async def authenticate_access(conn: AsyncSession, request: Request, keep_logged_
     if not token:
         raise HTTPException(HTTP_401_UNAUTHORIZED)
     try:
-        identity = verify_access_jwt(token, cfg)
+        # JWKS 조회는 블로킹 urllib 이라 이벤트 루프 밖에서
+        identity = await run_in_threadpool(verify_access_jwt, token, cfg)
     except AccessError:
         raise HTTPException(HTTP_401_UNAUTHORIZED) from None
     username = cfg.users.get(identity)
