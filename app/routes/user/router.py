@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request
 
 from common.schema import APIResponse, StringResponse
 from common.schema import response_maker as r_make
+from common.client_ip import get_client_ip
 from common.sqlsession import get_db
 
 from . import application, schema, service
@@ -60,7 +61,7 @@ async def get_current_user(request: Request, conn=get_db):
     return APIResponse(data=dict(res))
 
 
-@router.post("/auth", response_model=StringResponse, responses=r_make([401, 404, 429]))
+@router.post("/auth", response_model=StringResponse, responses=r_make([401, 429]))
 async def authenticate_user(
         request: Request, auth_data: schema.UserAuthParams, conn=get_db
 ):
@@ -68,11 +69,10 @@ async def authenticate_user(
     사용자를 인증합니다. 만일 인증에 성공하면 해당 사용자의 토큰을 반환합니다.<br>
     토큰은 jwt 토큰입니다.<br>
     <br>
-    401: 인증 실패<br>
-    404: 사용자를 찾을 수 없음<br>
-    429: 로그인 시도 횟수 초과<br>
+    401: 인증 실패 (없는 사용자도 401 — 사용자 존재 여부를 드러내지 않음)<br>
+    429: 로그인 시도 횟수 초과 (실제 클라이언트 IP + 사용자명 기준)<br>
     """
-    client_ip = request.client.host if request.client else "unknown"
+    client_ip = get_client_ip(request)
     res = await application.authenticate_user(conn, auth_data, client_ip)
     return APIResponse(data=res)
 

@@ -212,3 +212,42 @@ async def test_reset_password_then_login(
         },
     )
     assert ok.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_login_unknown_user_is_401_like_wrong_password(client: AsyncClient):
+    res = await client.post(
+        "/user/auth",
+        json={"username": "nosuchuser", "password": "whatever1", "keep_logged_in": False},
+    )
+    assert res.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_login_rate_limit_is_per_real_client_ip(client: AsyncClient):
+    """Behind the edge proxy every request comes from the proxy's IP; the limit must
+    follow the real client (CF-Connecting-IP / X-Forwarded-For), or one attacker
+    locks the account for everyone."""
+    from common.rate_limit import _MAX_ATTEMPTS
+
+    payload = {"username": "admin", "password": "wrongpass", "keep_logged_in": False}
+    attacker = {"CF-Connecting-IP": "203.0.113.7"}
+    for _ in range(_MAX_ATTEMPTS):
+        assert (await client.post("/user/auth", json=payload, headers=attacker)).status_code == 401
+    assert (await client.post("/user/auth", json=payload, headers=attacker)).status_code == 429
+
+    owner = {"CF-Connecting-IP": "198.51.100.20"}
+    ok = await client.post(
+        "/user/auth",
+        json={"username": "admin", "password": "adminpass1", "keep_logged_in": False},
+        headers=owner,
+    )
+    assert ok.status_code == 200
+
+    lan = {"X-Forwarded-For": "192.168.0.31, 172.31.0.5"}
+    ok_lan = await client.post(
+        "/user/auth",
+        json={"username": "admin", "password": "adminpass1", "keep_logged_in": False},
+        headers=lan,
+    )
+    assert ok_lan.status_code == 200
