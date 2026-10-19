@@ -30,6 +30,7 @@ async def list_users(conn: AsyncSession) -> Sequence[model.User]:
 
 
 async def reset_user_password(conn: AsyncSession, useridx: int, new_password: str) -> model.User:
+    """비밀번호 재설정: 해당 사용자의 모든 로그인(과 묶인 FCM)을 끊는다."""
     stmt = select(model.User).where(model.User.idx == useridx)
     result = await conn.execute(stmt)
     user = result.scalar_one_or_none()
@@ -38,12 +39,22 @@ async def reset_user_password(conn: AsyncSession, useridx: int, new_password: st
     user.password = hash_password(new_password)
     user.updated_at = datetime.now(UTC)
     conn.add(user)
+    await revoke_user_tokens(conn, user.idx)
     await conn.commit()
     await conn.refresh(user)
     return user
 
 
-async def update_user(conn: AsyncSession, useridx: int, item: schema.UserUpdateParams) -> model.User:
+async def update_user(
+    conn: AsyncSession,
+    useridx: int,
+    item: schema.UserUpdateParams,
+    current_token_idx: int | None = None,
+) -> model.User:
+    """비밀번호를 바꾸면 그 사용자의 다른 로그인(과 묶인 FCM)을 끊는다.
+
+    current_token_idx(요청을 보낸 로그인)는 남긴다 — 본인 비밀번호 변경 시 현재 세션 유지.
+    """
     stmt = select(model.User).where(model.User.idx == useridx)
     result = await conn.execute(stmt)
     user = result.scalar_one_or_none()
@@ -51,6 +62,7 @@ async def update_user(conn: AsyncSession, useridx: int, item: schema.UserUpdateP
         raise HTTPException(HTTP_404_NOT_FOUND)
     if item.password is not None:
         user.password = hash_password(item.password)
+        await revoke_user_tokens(conn, user.idx, keep_idx=current_token_idx)
     if item.permission is not None:
         user.permission = item.permission
     if item.username is not None:
@@ -85,6 +97,10 @@ async def delete_user(conn: AsyncSession, useridx: int) -> model.User:
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(HTTP_404_NOT_FOUND)
+    from routes.fcm import service as fcm_service  # 순환 import 회피
+
+    await revoke_user_tokens(conn, user.idx)
+    await fcm_service.delete_all_user_rows(conn, user.idx)  # 미바인딩 레거시 행 포함
     await conn.delete(user)
     await conn.commit()
     return user
@@ -134,8 +150,53 @@ async def get_token_by_value(conn: AsyncSession, token_value: str) -> model.Toke
 
 
 async def delete_token(conn: AsyncSession, token: model.Token) -> None:
-    await conn.delete(token)
+    await _delete_login_tokens(conn, [token])
     await conn.commit()
+
+
+async def _delete_login_tokens(
+    conn: AsyncSession, tokens: Sequence[model.Token]
+) -> None:
+    """Delete login tokens and the FCM rows bound to them (caller commits).
+
+    The FK is also ON DELETE CASCADE; deleting explicitly keeps this independent
+    of the SQLite foreign_keys pragma.
+    """
+    from routes.fcm import service as fcm_service  # 순환 import 회피
+
+    if not tokens:
+        return
+    await fcm_service.delete_for_login_tokens(conn, [t.idx for t in tokens])
+    for token in tokens:
+        await conn.delete(token)
+
+
+async def revoke_user_tokens(
+    conn: AsyncSession, user_idx: int, keep_idx: int | None = None
+) -> None:
+    """Delete all of a user's login tokens (+ bound FCM rows) except keep_idx (caller commits)."""
+    stmt = select(model.Token).where(model.Token.user_idx == user_idx)
+    if keep_idx is not None:
+        stmt = stmt.where(model.Token.idx != keep_idx)
+    result = await conn.execute(stmt)
+    await _delete_login_tokens(conn, result.scalars().all())
+
+
+async def logout(
+    conn: AsyncSession, user_idx: int, token_idx: int, fcm_token: str | None
+) -> bool:
+    """Delete the current login token and its FCM rows; optionally the caller's
+    own FCM row given by value. Returns whether that extra row was removed."""
+    from routes.fcm import service as fcm_service  # 순환 import 회피
+
+    fcm_removed = False
+    if fcm_token:
+        fcm_removed = await fcm_service.delete_user_fcm_token(conn, user_idx, fcm_token)
+    token = await conn.get(model.Token, token_idx)
+    if token is not None:
+        await _delete_login_tokens(conn, [token])
+    await conn.commit()
+    return fcm_removed
 
 
 async def delete_expired_tokens(conn: AsyncSession) -> None:
@@ -149,14 +210,16 @@ async def delete_expired_tokens(conn: AsyncSession) -> None:
         .where(model.Token.exp < now)
     )
     result = await conn.execute(stmt)
-    expired_tokens = result.scalars().all()
-    for token in expired_tokens:
-        await conn.delete(token)
+    await _delete_login_tokens(conn, result.scalars().all())
     await conn.commit()
 
 
+# 사용자별 로그인 토큰(=기기) 최대 개수. 넘으면 가장 오래된 것부터 삭제.
+MAX_LOGIN_TOKENS_PER_USER = 10
+
+
 async def cleanup_tokens(conn: AsyncSession, user_idx: int) -> None:
-    """사용자별 토큰 3개까지만 유지하고 나머지는 삭제한다."""
+    """사용자별 토큰 MAX_LOGIN_TOKENS_PER_USER 개까지만 유지하고 나머지는 삭제한다."""
     stmt = (
         select(model.Token)
         .where(model.Token.user_idx == user_idx)
@@ -164,7 +227,6 @@ async def cleanup_tokens(conn: AsyncSession, user_idx: int) -> None:
     )
     result = await conn.execute(stmt)
     tokens = result.scalars().all()
-    if len(tokens) > 3:
-        for token in tokens[3:]:
-            await conn.delete(token)
+    if len(tokens) > MAX_LOGIN_TOKENS_PER_USER:
+        await _delete_login_tokens(conn, tokens[MAX_LOGIN_TOKENS_PER_USER:])
         await conn.commit()

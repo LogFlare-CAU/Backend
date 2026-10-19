@@ -5,7 +5,7 @@ from common.schema import response_maker as r_make
 from common.sqlsession import get_db
 
 from . import application, schema, service
-from .authenticate import get_userid, require_login, require_moderator
+from .authenticate import get_token_idx, get_userid, require_login, require_moderator
 
 router = APIRouter(prefix="/user", tags=["user"])
 
@@ -78,6 +78,31 @@ async def authenticate_user(
 
 
 @router.post(
+    "/logout",
+    response_model=APIResponse[schema.LogoutResult],
+    responses=r_make([401]),
+    dependencies=require_login,
+)
+async def logout(
+        request: Request, item: schema.LogoutParams | None = None, conn=get_db
+):
+    """
+    현재 로그인 토큰을 삭제하고, 그 로그인에 묶인 FCM 토큰도 함께 삭제합니다.<br>
+    body 의 fcm_token(옵션)이 본인 소유면 그 행도 삭제합니다 (fcm_removed).<br>
+    이미 로그아웃된 토큰으로 다시 호출하면 인증 단계에서 401 이 반환됩니다.<br>
+    <br>
+    401: 인증 실패 (이미 로그아웃·만료된 토큰 포함)<br>
+    """
+    removed = await service.logout(
+        conn,
+        get_userid(request),
+        get_token_idx(request),
+        item.fcm_token if item else None,
+    )
+    return APIResponse(data=schema.LogoutResult(logged_out=True, fcm_removed=removed))
+
+
+@router.post(
     "/",
     response_model=schema.UserResponse,
     responses=r_make([403, 409]),
@@ -107,6 +132,7 @@ async def reset_user_password(
 ):
     """
     사용자의 비밀번호를 지정한 값으로 재설정합니다.<br>
+    해당 사용자의 모든 로그인 토큰과 그에 묶인 FCM 토큰이 삭제됩니다.<br>
     로그인 토큰이 필요하며, 관리자 권한이 있어야 합니다.<br>
     <br>
     403: 권한 없음<br>
@@ -129,13 +155,17 @@ async def update_user(
 ):
     """
     사용자의 정보를 수정합니다.<br>
+    비밀번호를 바꾸면 해당 사용자의 다른 로그인 토큰(과 묶인 FCM 토큰)이 삭제됩니다.
+    이 요청을 보낸 로그인은 유지됩니다.<br>
     로그인 토큰이 필요하며, 관리자 권한이 있어야 합니다.<br>
     <br>
     403: 권한 없음<br>
     404: 사용자를 찾을 수 없음<br>
     409: 이미 존재하는 사용자 이름<br>
     """
-    res = await service.update_user(conn, useridx, user_data)
+    res = await service.update_user(
+        conn, useridx, user_data, current_token_idx=get_token_idx(request)
+    )
     return APIResponse(data=dict(res))
 
 

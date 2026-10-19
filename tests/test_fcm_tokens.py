@@ -82,7 +82,7 @@ async def test_reassigned_token_survives_pruning(
 ):
     # The token that will be reassigned has the lowest idx.
     assert (await _register(client, admin_token, "old")).status_code == 200
-    for t in ("a", "b", "c"):
+    for t in "abcdefghij":  # fill the per-user cap (10)
         assert (await _register(client, plain_user[2], t)).status_code == 200
     res = await _register(client, plain_user[2], "old")
     assert res.status_code == 200, res.text

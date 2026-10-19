@@ -33,6 +33,17 @@ class ResetPasswordParams(BaseModel):
     new_password: str = Field(..., min_length=8, description="새 비밀번호")
 
 
+class LogoutParams(BaseModel):
+    fcm_token: str | None = Field(
+        None, description="이 기기의 FCM 토큰 (옵션). 본인 소유면 함께 삭제합니다."
+    )
+
+
+class LogoutResult(BaseModel):
+    logged_out: bool = Field(..., description="현재 로그인 토큰 삭제 여부 (항상 true)")
+    fcm_removed: bool = Field(..., description="body 의 fcm_token 행을 삭제했는지 여부")
+
+
 class UserUpdateParams(BaseModel):
     username: str | None = Field(None, min_length=3, max_length=32, description="사용자명")
     permission: int | None = Field(None, description="사용자 권한")
