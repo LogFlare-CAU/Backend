@@ -2,7 +2,26 @@
 
 Reference for the endpoints and ingest fields added in the app rework. All responses use the standard envelope `{ success, message, error_code, data }`. Auth is either a user JWT (`Authorization: Bearer <jwt>`) or, for ingest, the project headers (`Project` + `ProjectKey: Bearer <key>`).
 
-## Deploy
+## Release: push tied to login sessions (migration `c3d4e5f6a7b8`)
+
+Signed-out devices stop receiving pushes. Production must be at `b7c1d2e3f4a5` (the app rework release below).
+
+**Migration** `c3d4e5f6a7b8` (revises `b7c1d2e3f4a5`): adds `fcm_tokens.token_idx` (nullable, FK `fk_fcm_tokens_token_idx_tokens` → `tokens.idx`, `ON DELETE CASCADE`) and index `ix_fcm_tokens_token_idx`. On SQLite only the small `fcm_tokens` table is rebuilt (batch mode). Existing rows keep `token_idx = NULL`. Downgrade (`alembic downgrade -1`) drops the column, index and FK and keeps the rows.
+
+**Behaviour changes**
+
+* **Binding.** `POST /fcm/token` binds the row to the login token (JWT) that authenticated the request. Registering again from another login rebinds it. Pushes go only to rows whose login token still exists and has not expired.
+* **Legacy rows** (`token_idx IS NULL`, i.e. every row registered before this release) are still delivered while `last_delivery` (the last registration time) is within 30 days. After that they are deleted by the sweep that runs on every login. Rows with `last_delivery = NULL` count as stale. The updated app re-registers once after upgrade to bind its row. Old app builds re-register on every sign-in, which also binds.
+* **Revocation cascades.** Deleting a login token also deletes its bound FCM rows, in the same transaction. That covers logout, the expired-token sweep (on login), an expired token seen at auth time, the per-user cap, password reset and change, and user delete. User delete removes all of the user's FCM rows, bound or not.
+* **Password changes revoke sessions.** `POST /user/{id}/reset_password` deletes all of that user's login tokens. `PATCH /user/{id}` with `password` deletes all of that user's login tokens except the one that made the request, so changing your own password keeps your current session. Other devices must log in again.
+* **Caps 3 → 10.** Each user may hold up to 10 login tokens and 10 FCM tokens (previously 3 each). Beyond that the oldest is pruned, together with its bound FCM row.
+* **New `POST /user/logout`** (see Users below). `DELETE /fcm/token` is unchanged and still works for old app builds.
+* **Message shape.** Pushes are data-only: no `notification` block (it used to be sent empty), with `android.priority = "high"` and `android.ttl = 1h`. The `data` keys are unchanged (`errorid`, `type`, `level`, `timestamp`, `message`, `projectid`, `test`), and `message` is still truncated to 1000 characters to stay under FCM's 4 KB data limit. `POST /fcm/test` still accepts `title`/`body`, but they are not sent, as before.
+* **Send errors.** The token row is deleted on `UnregisteredError`, `SenderIdMismatchError`, or an `InvalidArgumentError` that mentions the registration token. Any other error is logged with only the token prefix and never raised, so one bad token no longer stops delivery to the rest.
+
+**Procedure:** the same as below, with these differences. Step 4 migrates to `c3d4e5f6a7b8`. In step 5, `alembic current` shows `c3d4e5f6a7b8 (head)`, `SELECT COUNT(*) FROM fcm_tokens` equals the pre-migration count, `PRAGMA foreign_key_list(fcm_tokens)` lists `users` (CASCADE) and `tokens.token_idx` (CASCADE), and `PRAGMA integrity_check` returns `ok`. Step 7 smoke test: log in, `POST /fcm/token`, check that `SELECT token_idx FROM fcm_tokens WHERE ...` is not NULL, `POST /user/logout`, check that the row is gone, then confirm a test ingest no longer pushes to that device. Watch the logs for `FCM send ... failed`.
+
+## Deploy (app rework, migration `b7c1d2e3f4a5`)
 
 Run the migration before starting the new server (migration `b7c1d2e3f4a5`, revises `b7c8d9e0f1a2` (error_groups); adds `errorlogs.logfile_id`, `errorlogs.raw`, two indexes, and uppercases existing `level` values). On SQLite the `errorlogs` table is rebuilt (batch mode): it holds the write lock for the whole run, needs about 2x the table size in free disk, and takes roughly 10-15 s per million rows. Production must already be at `b7c8d9e0f1a2`.
 
@@ -56,8 +75,14 @@ If verification fails, stop the server and restore the backup files.
 
 | Method + path | Auth | Body / response |
 |---|---|---|
-| `POST /fcm/token` | login | Body `{ "fcm_token": string }`. Returns the stored token record (`FCMTokenResponse`). Idempotent: registering the same token again refreshes it and reassigns it to the calling user if the device changed account. |
+| `POST /fcm/token` | login | Body `{ "fcm_token": string }`. Returns the stored token record (`FCMTokenResponse`, keys `idx`, `user_idx`, `last_delivery`; unchanged). Idempotent: registering the same token again refreshes it and reassigns it to the calling user and **login** (rebind). The row is bound to the login token of the request and stops receiving pushes when that login is logged out, expires, or is revoked. Up to 10 per user; the oldest is pruned. |
 | `DELETE /fcm/token` | login | Body `{ "fcm_token": string }`. Removes only a token owned by the caller. The body is JSON, so Retrofit needs `@HTTP(method = "DELETE", path = "/fcm/token", hasBody = true)`. Returns `{ "removed": bool }`; `false` if the token belongs to someone else or does not exist. |
+
+### Users
+
+| Method + path | Auth | Body / response |
+|---|---|---|
+| `POST /user/logout` | login | Optional body `{ "fcm_token": string }`. Deletes the login token that authenticated the request and every FCM row bound to it. If `fcm_token` is given and owned by the caller, that row is deleted too (covers legacy rows not yet bound). Returns `{ "logged_out": true, "fcm_removed": bool }` (`fcm_removed` refers to the body token only). Calling it again with the same token returns `401`, because the token no longer exists. Servers without this endpoint return **`405`** (not 404, because `POST /user/logout` also matches the `PATCH`/`DELETE /user/{useridx}` path), so clients should fall back to `DELETE /fcm/token` on 404 **or** 405. |
 
 ## Changed existing behavior
 
