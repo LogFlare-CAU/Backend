@@ -103,6 +103,7 @@ async def get_event_detail(request: Request, error_id: int, conn=get_db):
     에러 한 건의 원본(raw)과 같은 그룹의 발생 통계<br>
     <br>
     recent_ids: 같은 그룹의 최신 ID 최대 10개 (자신 제외, 최신순)<br>
+    recent: recent_ids 와 같은 행들의 id/timestamp/level (+ 그룹 메시지와 다를 때만 message)<br>
     <br>
     403: 프로젝트 접근 권한 없음, 404: 에러 없음
     """

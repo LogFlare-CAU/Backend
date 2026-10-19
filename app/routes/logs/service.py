@@ -347,12 +347,12 @@ async def get_event_detail(
     event = _to_event((await conn.execute(_event_select(sub))).one())
     recent = (
         await conn.execute(
-            select(E.id)
+            select(E.id, E.timestamp, E.level, E.message)
             .where(*in_group, E.id != error_id)
             .order_by(E.id.desc())
             .limit(RECENT_IDS_LIMIT)
         )
-    ).scalars().all()
+    ).all()
     return schema.LogEventDetail(
         **{
             **event.model_dump(),
@@ -363,5 +363,14 @@ async def get_event_detail(
         occurred_at=row.timestamp,
         row_level=(row.level or "").upper(),
         raw=row.raw,
-        recent_ids=list(recent),
+        recent_ids=[r.id for r in recent],
+        recent=[
+            schema.RecentOccurrence(
+                id=r.id,
+                timestamp=r.timestamp,
+                level=(r.level or "").upper(),
+                message=r.message if r.message != event.message else None,
+            )
+            for r in recent
+        ],
     )

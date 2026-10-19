@@ -50,6 +50,10 @@ async def test_event_detail_raw_and_group(client, admin_token, project_with_key)
     assert d["first_seen"] < d["last_seen"]
     assert d["recent_ids"] == ids[-2:-12:-1]
     assert len(d["recent_ids"]) == 10 and ids[-1] not in d["recent_ids"]
+    assert [r["id"] for r in d["recent"]] == d["recent_ids"]
+    assert all(r["timestamp"] and r["level"] for r in d["recent"])
+    assert {r["level"] for r in d["recent"]} <= {"WARNING", "ERROR"}
+    assert all(r["message"] is None for r in d["recent"])
 
     # an earlier occurrence: same group, its own raw, excludes itself
     res = await client.get(f"/log/events/{ids[0]}", headers=_auth(admin_token))
@@ -115,3 +119,18 @@ async def test_events_list_not_shadowed(client, admin_token, project_with_key):
     assert res.status_code == 200 and "items" in res.json()["data"]
     res = await client.get(f"/log/events/{eid}", headers=_auth(admin_token))
     assert res.json()["data"]["id"] == eid
+
+
+async def test_event_detail_recent_has_row_times_and_differing_message(
+    client, admin_token, project_with_key
+):
+    pid = project_with_key[2]
+    a = await _insert(pid, "same", "E", "ERROR", 30)
+    b = await _insert(pid, "same", "E", "WARNING", 20)
+    res = await client.get(f"/log/events/{b}", headers=_auth(admin_token))
+    (r,) = res.json()["data"]["recent"]
+    assert r["id"] == a and r["level"] == "ERROR" and r["message"] is None
+    with_ts = await client.get(f"/log/events/{a}", headers=_auth(admin_token))
+    (r2,) = with_ts.json()["data"]["recent"]
+    assert r2["id"] == b and r2["level"] == "WARNING"
+    assert r2["timestamp"].endswith("Z") or "+" in r2["timestamp"]

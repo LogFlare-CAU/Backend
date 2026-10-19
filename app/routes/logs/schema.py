@@ -66,12 +66,24 @@ class LogEvent(BaseModel):
     last_seen: UtcDatetime
 
 
+class RecentOccurrence(BaseModel):
+    id: int
+    timestamp: UtcDatetime = Field(..., description="그 행의 발생 시각")
+    level: str = Field(..., description="그 행의 레벨 (대문자)")
+    message: str | None = Field(
+        None, description="그룹 메시지와 다를 때만 채워지는 그 행의 메시지"
+    )
+
+
 class LogEventDetail(LogEvent):
     occurred_at: UtcDatetime = Field(..., description="요청한 행의 발생 시각")
     row_level: str = Field(..., description="요청한 행의 레벨 (대문자)")
     raw: str | None = Field(None, description="이 에러의 원본 로그 페이로드")
     recent_ids: list[int] = Field(
         default_factory=list, description="같은 그룹의 최신 ID 최대 10개 (자신 제외, 최신순)"
+    )
+    recent: list[RecentOccurrence] = Field(
+        default_factory=list, description="recent_ids 와 같은 행들의 id/시각/레벨 (같은 순서)"
     )
 
 

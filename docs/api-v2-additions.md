@@ -51,7 +51,7 @@ If verification fails, stop the server and restore the backup files.
 |---|---|---|---|
 | `GET /log/summary` | login | `project_id` (optional, 403 if no access), `hours` (1-168, default 24) | `window_hours`, `since`, `counts` (level to count), `projects[]` (`project_id`, `error_count`, `warning_count`, `last_error_at`) |
 | `GET /log/events` | login | `project_id`, `min_level` (DEBUG, INFO, WARNING, ERROR, CRITICAL), `logfile_id`, `since`, `until`, `q` (case-insensitive match on message/errortype), `sort` (newest, oldest, highest, lowest; default newest), `grouped` (default true), `limit` (1-200, default 50), `cursor` | `items[]` (`id`, `project_id`, `logfile_id`, `logfile_name`, `errortype`, `message`, `level`, `timestamp`, `occurrences`, `first_seen`, `last_seen`, `group_key`), `next_cursor`. Bad cursor returns 400. |
-| `GET /log/events/{error_id}` | login | path `error_id` | Event fields above, plus `occurred_at`, `row_level`, `raw` and `recent_ids` (up to 10 newest IDs in the same group, excluding this one). 403 without project access, 404 if missing. |
+| `GET /log/events/{error_id}` | login | path `error_id` | Event fields above, plus `occurred_at`, `row_level`, `raw` and `recent_ids` (up to 10 newest IDs in the same group, excluding this one). `recent[]` (same rows and order as `recent_ids`: `id`, `timestamp`, `level`, and `message` only when it differs from the group message, else null; additive, clients may fall back to `recent_ids`). 403 without project access, 404 if missing. |
 
 #### Semantics
 
