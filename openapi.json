@@ -223,6 +223,28 @@
         ]
       }
     },
+    "/user/auth/modes": {
+      "get": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Get Auth Modes",
+        "description": "서버가 허용하는 로그인 방식을 반환합니다. 인증이 필요 없습니다.<br>\nmodes 는 \"password\"(POST /user/auth), \"access\"(POST /user/auth/access) 중 켜진 것만 이 순서로 담깁니다.<br>",
+        "operationId": "get_auth_modes_user_auth_modes_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_AuthModes_"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/user/auth": {
       "post": {
         "tags": [
@@ -254,6 +276,16 @@
           },
           "401": {
             "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
@@ -2763,6 +2795,47 @@
         "title": "APIResponse",
         "description": "API 공통 응답 스키마"
       },
+      "APIResponse_AuthModes_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "API 호출 성공 여부",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "처리 결과에 대한 메시지",
+            "default": "success"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code",
+            "description": "에러 코드"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AuthModes"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "API 호출 결과 데이터"
+          }
+        },
+        "type": "object",
+        "title": "APIResponse[AuthModes]"
+      },
       "APIResponse_FCMClientConfig_": {
         "properties": {
           "success": {
@@ -2984,6 +3057,23 @@
         },
         "type": "object",
         "title": "AccessAuthParams"
+      },
+      "AuthModes": {
+        "properties": {
+          "modes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Modes",
+            "description": "서버가 허용하는 로그인 방식 (\"password\", \"access\" 순서)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "modes"
+        ],
+        "title": "AuthModes"
       },
       "ErrorParams": {
         "properties": {
