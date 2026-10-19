@@ -285,6 +285,85 @@
         }
       }
     },
+    "/user/auth/access": {
+      "post": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Authenticate Access",
+        "description": "Cloudflare Access JWT 로 로그인합니다. 성공하면 /user/auth 와 같은 로그인 토큰을 반환합니다.<br>\nJWT 는 헤더 Cf-Access-Jwt-Assertion (없으면 쿠키 CF_Authorization) 에서 읽고,\n서명(RS256, 팀 JWKS)·aud·iss·exp 를 검증한 뒤 LOGFLARE_ACCESS_USERS 로 사용자를 찾습니다.<br>\n<br>\n401: 토큰 없음·검증 실패·매핑 없음·사용자 없음 (이유는 구분하지 않음)<br>\n404: Access 로그인이 설정되지 않음<br>\n429: 실패 횟수 초과 (클라이언트 IP 기준)<br>",
+        "operationId": "authenticate_access_user_auth_access_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/AccessAuthParams"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Auth Data"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_str_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/user/logout": {
       "post": {
         "tags": [
@@ -2893,6 +2972,18 @@
         },
         "type": "object",
         "title": "StringResponse"
+      },
+      "AccessAuthParams": {
+        "properties": {
+          "keep_logged_in": {
+            "type": "boolean",
+            "title": "Keep Logged In",
+            "description": "로그인 상태 유지 여부",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "AccessAuthParams"
       },
       "ErrorParams": {
         "properties": {
