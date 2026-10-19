@@ -229,7 +229,7 @@
           "user"
         ],
         "summary": "Authenticate User",
-        "description": "사용자를 인증합니다. 만일 인증에 성공하면 해당 사용자의 토큰을 반환합니다.<br>\n토큰은 jwt 토큰입니다.<br>\n<br>\n401: 인증 실패<br>\n404: 사용자를 찾을 수 없음<br>\n429: 로그인 시도 횟수 초과<br>",
+        "description": "사용자를 인증합니다. 만일 인증에 성공하면 해당 사용자의 토큰을 반환합니다.<br>\n토큰은 jwt 토큰입니다.<br>\n<br>\n401: 인증 실패 (없는 사용자도 401 — 사용자 존재 여부를 드러내지 않음)<br>\n429: 로그인 시도 횟수 초과 (실제 클라이언트 IP + 사용자명 기준)<br>",
         "operationId": "authenticate_user_user_auth_post",
         "requestBody": {
           "content": {
@@ -254,16 +254,6 @@
           },
           "401": {
             "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not Found",
             "content": {
               "application/json": {
                 "schema": {
