@@ -27,11 +27,18 @@ _NORMALIZERS = [
 ]
 
 
-def normalize(message: str) -> str:
+def headline(message: str) -> str:
+    """사람이 볼 대표 줄. 트레이스백이면 마지막 예외 줄, 아니면 첫 줄."""
     lines = [ln for ln in message.splitlines() if ln.strip()]
     if not lines:
         return ""
-    line = lines[-1] if "Traceback (most recent call last):" in message else lines[0]
+    if _TB_START in message or _FRAME.match(lines[0]):
+        return (_exc_line(lines) or lines[-1]).strip()
+    return lines[0].strip()
+
+
+def normalize(message: str) -> str:
+    line = headline(message)
     for rx, repl in _NORMALIZERS:
         line = rx.sub(repl, line)
     return line.strip()
@@ -55,10 +62,29 @@ _JSON_LEVELS = {
 }
 _ERR_RX = re.compile(r"\b(CRITICAL|FATAL|ERROR|Traceback|Exception|panic)\b", re.I)
 _WARN_RX = re.compile(r"\b(WARNING|WARN)\b", re.I)
-_ACCESS_RX = re.compile(r'HTTP/1\.[01]" \d{3}')
+_ACCESS_RX = re.compile(r'HTTP/(?:1\.[01]|2(?:\.0)?|3)" \d{3}')
 _EXC_LINE = re.compile(r"^([\w.]+)(?::|$)")
+_LEVEL_WORDS = {"TRACE", "DEBUG", "INFO", "NOTICE", "WARN", "WARNING", "ERROR", "CRITICAL", "FATAL"}
+_FRAME = re.compile(r'^\s+File "')
 _CHAIN = ("During handling of the above exception", "The above exception was the direct cause")
 _TB_START = "Traceback (most recent call last):"
+
+
+def _is_exc_line(line: str) -> bool:
+    """프레임 뒤 비들여쓰기 줄이 예외 줄처럼 생겼는지. 로그 줄(INFO: …, 시각으로 시작)은 아니다."""
+    m = _EXC_LINE.match(line)
+    return bool(m) and m.group(1).upper() not in _LEVEL_WORDS
+
+
+def _exc_line(lines: list[str]) -> str | None:
+    """마지막 비들여쓰기 줄이 예외 줄이면 그 줄 (ExceptionGroup 의 하위 블록은 들여쓰기라 건너뛴다)."""
+    for ln in reversed(lines):
+        if not ln.strip() or ln[:1] in " \t":
+            continue
+        if ln.strip() == _TB_START or ln.startswith(_CHAIN) or not _is_exc_line(ln):
+            return None
+        return ln
+    return None
 
 
 def classify(line: str) -> tuple[str, str | None] | None:
@@ -84,22 +110,48 @@ def classify(line: str) -> tuple[str, str | None] | None:
 
 
 class LineAssembler:
-    """줄을 하나씩 받아 Entry 로 묶는다. 트레이스백(체인 포함)은 한 Entry."""
+    """줄을 하나씩 받아 Entry 로 묶는다.
+
+    - 트레이스백(체인·ExceptionGroup 포함)은 한 Entry.
+    - 바로 뒤에 트레이스백이 오는 ERROR 줄(logger.exception)은 그 트레이스백의 머리로 합친다.
+    - 아직 끝나지 않은 줄은 pending() 으로 꺼내 다음 폴링의 새 assembler 에 먼저 넣으면 이어진다.
+    """
 
     def __init__(self) -> None:
-        self._buf: list[str] = []
-        self._ts: datetime | None = None
+        self._head: tuple[datetime, str, str] | None = None  # 트레이스백이 이어지는지 기다리는 ERROR 줄
+        self._buf: list[tuple[datetime, str]] = []
+        self._level = "ERROR"
+        self._bare = False  # Traceback 머리 없이 File 줄로 시작 (스크립트 SyntaxError)
         self._done = False  # 예외 줄까지 읽음 — 체인이 이어지는지 다음 줄로 판단
 
-    def _emit(self) -> list[Entry]:
-        buf, ts, self._buf, self._ts, self._done = self._buf, self._ts, [], None, False
-        while buf and not buf[-1].strip():
-            buf.pop()
-        if not buf or ts is None:
+    def pending(self) -> list[tuple[datetime, str]]:
+        head = [(self._head[0], self._head[1])] if self._head else []
+        return head + list(self._buf)
+
+    def in_frames(self) -> bool:
+        """예외 줄을 아직 못 읽은 트레이스백 중간."""
+        return bool(self._buf) and not self._done
+
+    def _emit_head(self) -> list[Entry]:
+        if self._head is None:
             return []
-        m = _EXC_LINE.match(buf[-1])
-        etype = m.group(1).rsplit(".", 1)[-1] if m else None
-        return [Entry("ERROR", etype, "\n".join(buf), ts)]
+        ts, line, level = self._head
+        self._head = None
+        return [Entry(level, None, line, ts)]
+
+    def _emit(self) -> list[Entry]:
+        buf, level, bare = self._buf, self._level, self._bare
+        self._buf, self._level, self._bare, self._done = [], "ERROR", False, False
+        while buf and not buf[-1][1].strip():
+            buf.pop()
+        if not buf:
+            return []
+        lines = [ln for _, ln in buf]
+        exc = _exc_line(lines)
+        if bare and exc is None:
+            return []  # 예외 줄 없는 File 줄 묶음(print_stack 등)은 에러가 아니다
+        etype = _EXC_LINE.match(exc).group(1).rsplit(".", 1)[-1] if exc else None
+        return [Entry(level, etype, "\n".join(lines), buf[0][0])]
 
     def feed(self, ts: datetime, line: str) -> list[Entry]:
         line = line.rstrip("\r\n")
@@ -107,28 +159,41 @@ class LineAssembler:
         if self._buf:
             blank = not line.strip()
             if self._done:
-                if blank:
-                    self._buf.append(line)
+                if blank or line[0] in " \t":  # 빈 줄, ExceptionGroup 하위 블록
+                    self._buf.append((ts, line))
                     return []
                 if line.startswith(_CHAIN):
-                    self._buf.append(line)
+                    self._buf.append((ts, line))
                     self._done = False
                     return []
                 out = self._emit()
             elif blank or line[0] in " \t" or line.strip() == _TB_START:
-                self._buf.append(line)
+                self._buf.append((ts, line))
                 return []
-            else:  # 프레임 뒤 첫 비들여쓰기 줄 = 예외 줄
-                self._buf.append(line)
+            elif _is_exc_line(line):  # 프레임 뒤 첫 비들여쓰기 줄 = 예외 줄
+                self._buf.append((ts, line))
                 self._done = True
                 return []
+            else:  # 잘린 트레이스백 — 이 줄은 아래에서 새로 판정한다
+                out = self._emit()
         if line.strip() == _TB_START:
-            self._buf, self._ts = [line], ts
+            if self._head is not None:
+                hts, hline, hlevel = self._head
+                self._head = None
+                self._buf, self._level = [(hts, hline), (ts, line)], hlevel
+            else:
+                self._buf = [(ts, line)]
+            return out
+        out += self._emit_head()
+        if _FRAME.match(line):
+            self._buf, self._bare = [(ts, line)], True
             return out
         c = classify(line)
-        if c:
+        if c and c[0] != "WARNING":
+            self._head = (ts, line, c[0])
+        elif c:
             out.append(Entry(c[0], c[1], line, ts))
         return out
 
     def flush(self) -> list[Entry]:
-        return self._emit()
+        return self._emit() + self._emit_head()

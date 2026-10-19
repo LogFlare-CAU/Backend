@@ -108,3 +108,93 @@ def test_mask_secrets_linear_on_long_words():
     out = mask_secrets("y" * 65_536 + " password=hunter2 " + "z" * 65_536)
     assert time.perf_counter() - t < 2.0
     assert "hunter2" not in out
+
+
+# --- #31: 대표 줄, 이어 붙이기, 헤더 합치기, 잘린 트레이스백 ---
+from routes.collector.parse import headline  # noqa: E402
+
+TB = ["Traceback (most recent call last):", '  File "x.py", line 1, in f', "    boom()", "ValueError: bad 42"]
+
+
+def test_headline_uses_exception_line():
+    assert headline("\n".join(TB)) == "ValueError: bad 42"
+    assert headline("ERROR:    Exception in ASGI application\n" + "\n".join(TB)) == "ValueError: bad 42"
+    assert headline("plain first\nsecond") == "plain first"
+    assert headline("") == ""
+
+
+def test_headline_exception_group_and_truncated():
+    eg = "\n".join(TB[:3] + ["ExceptionGroup: two (2 sub-exceptions)", "  +-+---- 1 ----", "    | ValueError: a"])
+    assert headline(eg) == "ExceptionGroup: two (2 sub-exceptions)"
+    # 예외 줄이 없는 잘린 트레이스백은 마지막 줄
+    assert headline("\n".join(TB[:3])) == "    boom()".strip()
+
+
+def test_access_log_http2_and_3_ignored():
+    assert classify('INFO:     1.2.3.4:5 - "GET /error HTTP/2" 500 Internal Server Error') is None
+    assert classify('INFO:     1.2.3.4:5 - "GET /error HTTP/2.0" 500 Internal Server Error') is None
+    assert classify('INFO:     1.2.3.4:5 - "GET /error HTTP/3" 502 Bad Gateway') is None
+
+
+def test_error_header_merged_with_traceback():
+    out = _run(["ERROR:    Exception in ASGI application", *TB, "INFO next"])
+    assert len(out) == 1
+    assert out[0].errortype == "ValueError" and out[0].message.startswith("ERROR:    Exception in ASGI")
+    # 지문은 헤더가 없을 때와 같다 (기존 묶음 유지)
+    assert fingerprint("s", "ERROR", out[0].message) == fingerprint("s", "ERROR", "\n".join(TB))
+
+
+def test_error_line_not_followed_by_traceback_stays_alone():
+    out = _run(["ERROR one", "ERROR two", "INFO fine"])
+    assert [e.message for e in out] == ["ERROR one", "ERROR two"]
+
+
+def test_truncated_traceback_does_not_eat_next_log_line():
+    out = _run([*TB[:3], "INFO:     1.2.3.4:5 - \"GET / HTTP/1.1\" 200 OK", "ERROR later"])
+    assert [e.message.splitlines()[0] for e in out] == ["Traceback (most recent call last):", "ERROR later"]
+    assert out[0].errortype is None
+    out = _run([*TB[:3], "2026-10-18 12:00:00 ERROR db down"])
+    assert len(out) == 2 and out[1].message == "2026-10-18 12:00:00 ERROR db down"
+
+
+def test_bare_syntax_error_without_traceback_header():
+    out = _run(['  File "/app/main.py", line 3', "    x = (", "        ^", "SyntaxError: '(' was never closed", "INFO next"])
+    assert len(out) == 1 and out[0].errortype == "SyntaxError"
+    assert headline(out[0].message) == "SyntaxError: '(' was never closed"
+
+
+def test_syntax_error_caret_inside_traceback():
+    out = _run(["Traceback (most recent call last):", '  File "a.py", line 3, in <module>', "    import b",
+                '  File "b.py", line 1', "    x = (", "        ^^^", "SyntaxError: '(' was never closed", "INFO next"])
+    assert len(out) == 1 and out[0].errortype == "SyntaxError"
+
+
+def test_exception_group_sub_blocks_stay_in_entry():
+    out = _run([*TB[:3], "ExceptionGroup: two (2 sub-exceptions)", "  +-+---- 1 ----", "    | ValueError: a", "INFO next"])
+    assert len(out) == 1 and "ValueError: a" in out[0].message
+
+
+def test_pending_lines_resume_across_feeds():
+    t2 = T.replace(second=5)
+    a = LineAssembler()
+    out = []
+    for ln in TB[:2]:
+        out += a.feed(T, ln)
+    assert out == [] and a.pending() == [(T, TB[0]), (T, TB[1])] and a.in_frames()
+    b = LineAssembler()  # 다음 폴링: 넘겨받은 줄을 먼저 다시 넣는다
+    for ts, ln in a.pending():
+        out += b.feed(ts, ln)
+    for ln in TB[2:]:
+        out += b.feed(t2, ln)
+    assert out == [] and not b.in_frames()  # 예외 줄까지 읽었지만 체인이 이어질 수 있다
+    out += b.feed(t2, "INFO next")
+    assert len(out) == 1 and out[0].ts == T and out[0].errortype == "ValueError"
+    assert b.pending() == []
+
+
+def test_pending_includes_held_error_header():
+    a = LineAssembler()
+    assert a.feed(T, "ERROR:    Exception in ASGI application") == []
+    assert a.pending() == [(T, "ERROR:    Exception in ASGI application")]
+    assert not a.in_frames()
+    assert [e.message for e in a.flush()] == ["ERROR:    Exception in ASGI application"]
