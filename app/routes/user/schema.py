@@ -59,3 +59,7 @@ class UserUpdateParams(BaseModel):
 
 UserResponse = make_named_response(User, "UserResponse")
 UserSequenceResponse = make_named_response(Sequence[User], "UserSequenceResponse")
+
+
+class AccessAuthParams(BaseModel):
+    keep_logged_in: bool = Field(False, description="로그인 상태 유지 여부")

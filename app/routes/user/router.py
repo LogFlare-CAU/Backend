@@ -77,6 +77,25 @@ async def authenticate_user(
     return APIResponse(data=res)
 
 
+@router.post("/auth/access", response_model=StringResponse, responses=r_make([401, 404, 429]))
+async def authenticate_access(
+        request: Request, auth_data: schema.AccessAuthParams | None = None, conn=get_db
+):
+    """
+    Cloudflare Access JWT 로 로그인합니다. 성공하면 /user/auth 와 같은 로그인 토큰을 반환합니다.<br>
+    JWT 는 헤더 Cf-Access-Jwt-Assertion (없으면 쿠키 CF_Authorization) 에서 읽고,
+    서명(RS256, 팀 JWKS)·aud·iss·exp 를 검증한 뒤 LOGFLARE_ACCESS_USERS 로 사용자를 찾습니다.<br>
+    <br>
+    401: 토큰 없음·검증 실패·매핑 없음·사용자 없음 (이유는 구분하지 않음)<br>
+    404: Access 로그인이 설정되지 않음<br>
+    429: 실패 횟수 초과 (클라이언트 IP 기준)<br>
+    """
+    res = await application.authenticate_access(
+        conn, request, auth_data.keep_logged_in if auth_data else False
+    )
+    return APIResponse(data=res)
+
+
 @router.post(
     "/logout",
     response_model=APIResponse[schema.LogoutResult],
