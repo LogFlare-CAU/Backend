@@ -295,13 +295,77 @@
         }
       }
     },
+    "/user/logout": {
+      "post": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Logout",
+        "description": "현재 로그인 토큰을 삭제하고, 그 로그인에 묶인 FCM 토큰도 함께 삭제합니다.<br>\nbody 의 fcm_token(옵션)이 본인 소유면 그 행도 삭제합니다 (fcm_removed).<br>\n이미 로그아웃된 토큰으로 다시 호출하면 인증 단계에서 401 이 반환됩니다.<br>\n<br>\n401: 인증 실패 (이미 로그아웃·만료된 토큰 포함)<br>",
+        "operationId": "logout_user_logout_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/LogoutParams"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Item"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_LogoutResult_"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Authorization": []
+          }
+        ]
+      }
+    },
     "/user/{useridx}/reset_password": {
       "post": {
         "tags": [
           "user"
         ],
         "summary": "Reset User Password",
-        "description": "사용자의 비밀번호를 지정한 값으로 재설정합니다.<br>\n로그인 토큰이 필요하며, 관리자 권한이 있어야 합니다.<br>\n<br>\n403: 권한 없음<br>\n404: 사용자를 찾을 수 없음<br>",
+        "description": "사용자의 비밀번호를 지정한 값으로 재설정합니다.<br>\n해당 사용자의 모든 로그인 토큰과 그에 묶인 FCM 토큰이 삭제됩니다.<br>\n본인 비밀번호를 재설정하면 현재 로그인은 유지됩니다.<br>\n로그인 토큰이 필요하며, 관리자 권한이 있어야 합니다.<br>\n<br>\n403: 권한 없음<br>\n404: 사용자를 찾을 수 없음<br>",
         "operationId": "reset_user_password_user__useridx__reset_password_post",
         "security": [
           {
@@ -379,7 +443,7 @@
           "user"
         ],
         "summary": "Update User",
-        "description": "사용자의 정보를 수정합니다.<br>\n로그인 토큰이 필요하며, 관리자 권한이 있어야 합니다.<br>\n<br>\n403: 권한 없음<br>\n404: 사용자를 찾을 수 없음<br>\n409: 이미 존재하는 사용자 이름<br>",
+        "description": "사용자의 정보를 수정합니다.<br>\n비밀번호를 바꾸면 해당 사용자의 다른 로그인 토큰(과 묶인 FCM 토큰)이 삭제됩니다.\n이 요청을 보낸 로그인은 유지됩니다.<br>\n로그인 토큰이 필요하며, 관리자 권한이 있어야 합니다.<br>\n<br>\n403: 권한 없음<br>\n404: 사용자를 찾을 수 없음<br>\n409: 이미 존재하는 사용자 이름<br>",
         "operationId": "update_user_user__useridx__patch",
         "security": [
           {
@@ -2115,7 +2179,7 @@
           "fcm"
         ],
         "summary": "Register Fcm Token",
-        "description": "FCM 토큰을 등록합니다.<br>\n로그인 토큰이 필요합니다.",
+        "description": "FCM 토큰을 등록합니다.<br>\n로그인 토큰이 필요합니다.<br>\n행은 이 요청을 인증한 로그인 토큰에 묶이며, 다른 로그인으로 다시 등록하면 그 로그인으로 옮겨집니다.<br>\n묶인 로그인 토큰이 만료·삭제되면 이 기기로는 더 이상 푸시를 보내지 않습니다.",
         "operationId": "register_fcm_token_fcm_token_post",
         "requestBody": {
           "content": {
@@ -2711,6 +2775,47 @@
         },
         "type": "object",
         "title": "APIResponse[FCMTokenRemoved]"
+      },
+      "APIResponse_LogoutResult_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "API 호출 성공 여부",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "처리 결과에 대한 메시지",
+            "default": "success"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code",
+            "description": "에러 코드"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LogoutResult"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "API 호출 결과 데이터"
+          }
+        },
+        "type": "object",
+        "title": "APIResponse[LogoutResult]"
       },
       "APIResponse_list_str__": {
         "properties": {
@@ -3706,6 +3811,44 @@
         },
         "type": "object",
         "title": "LogSummaryResponse"
+      },
+      "LogoutParams": {
+        "properties": {
+          "fcm_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fcm Token",
+            "description": "이 기기의 FCM 토큰 (옵션). 본인 소유면 함께 삭제합니다."
+          }
+        },
+        "type": "object",
+        "title": "LogoutParams"
+      },
+      "LogoutResult": {
+        "properties": {
+          "logged_out": {
+            "type": "boolean",
+            "title": "Logged Out",
+            "description": "현재 로그인 토큰 삭제 여부 (항상 true)"
+          },
+          "fcm_removed": {
+            "type": "boolean",
+            "title": "Fcm Removed",
+            "description": "body 의 fcm_token 행을 삭제했는지 여부"
+          }
+        },
+        "type": "object",
+        "required": [
+          "logged_out",
+          "fcm_removed"
+        ],
+        "title": "LogoutResult"
       },
       "ProjectCreateParams": {
         "properties": {
