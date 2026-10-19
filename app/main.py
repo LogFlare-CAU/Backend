@@ -18,6 +18,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy.exc import IntegrityError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from common.access import warn_auth_mode_mismatch
 from common.env_utils import getenvval
 from common.fcm import init as fcm_init
 from common.logger_setup import get_logger, setup_uvicorn_file_logging
@@ -45,6 +46,7 @@ async def lifespan(app: FastAPI):
     # 앱 시작 시 초기화 작업
     fcm.init()
     await user.init_superuser()
+    warn_auth_mode_mismatch()
     docker_url = getenvval("LOGFLARE_DOCKER_URL", "")
     docker = DockerClient(docker_url) if docker_url else None
     task = asyncio.create_task(run_collector(docker)) if docker else None

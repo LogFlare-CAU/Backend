@@ -27,6 +27,9 @@ def full_access(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def clean_modes(monkeypatch):
+    from common import access
+
+    access._warned_unknown.clear()
     monkeypatch.delenv("LOGFLARE_AUTH_MODES", raising=False)
 
 
@@ -91,6 +94,43 @@ async def test_unknown_word_ignored_and_logged(client, monkeypatch, caplog):
     assert "sms" in caplog.text
 
 
+async def test_unknown_word_warned_once_per_process(client, monkeypatch, caplog):
+    monkeypatch.setenv("LOGFLARE_AUTH_MODES", "password,sms")
+    with caplog.at_level("WARNING"):
+        for _ in range(3):
+            await _modes(client)
+    assert caplog.text.count("sms") == 1
+
+
+def test_startup_warns_access_config_without_mode(full_access, monkeypatch, caplog):
+    from common.access import warn_auth_mode_mismatch
+
+    with caplog.at_level("WARNING", logger="common.access"):
+        warn_auth_mode_mismatch()
+    assert "Access 로그인이 꺼져 있습니다" in caplog.text
+    assert AUD not in caplog.text and TEAM not in caplog.text
+
+
+def test_startup_warns_access_mode_without_config(monkeypatch, caplog):
+    from common.access import warn_auth_mode_mismatch
+
+    for name in ("TEAM_DOMAIN", "AUD", "USERS"):
+        monkeypatch.delenv(f"LOGFLARE_ACCESS_{name}", raising=False)
+    monkeypatch.setenv("LOGFLARE_AUTH_MODES", "password,access")
+    with caplog.at_level("WARNING", logger="common.access"):
+        warn_auth_mode_mismatch()
+    assert "Access 설정이 덜 채워져" in caplog.text
+
+
+def test_startup_quiet_when_consistent(full_access, monkeypatch, caplog):
+    from common.access import warn_auth_mode_mismatch
+
+    monkeypatch.setenv("LOGFLARE_AUTH_MODES", "password,access")
+    with caplog.at_level("WARNING", logger="common.access"):
+        warn_auth_mode_mismatch()
+    assert caplog.text == ""
+
+
 async def test_existing_token_survives_mode_change(client, full_access, monkeypatch):
     token = (await client.post("/user/auth", json=PW)).json()["data"]
     monkeypatch.setenv("LOGFLARE_AUTH_MODES", "access")
@@ -105,3 +145,7 @@ async def test_modes_in_openapi():
     op = schema["paths"]["/user/auth/modes"]["get"]
     ref = op["responses"]["200"]["content"]["application/json"]["schema"]
     assert ref, op
+    schemas = schema["components"]["schemas"]
+    auth_modes = schemas["AuthModes"]
+    assert "modes" in auth_modes["properties"]
+    assert auth_modes["properties"]["modes"]["type"] == "array"

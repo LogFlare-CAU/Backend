@@ -51,24 +51,42 @@ def load_access_config() -> AccessConfig | None:
 KNOWN_AUTH_MODES = ("password", "access")
 
 
+_warned_unknown: set[str] = set()
+
+
+def _listed_modes() -> set[str]:
+    raw = str(getenvval("LOGFLARE_AUTH_MODES", "") or "").strip()
+    if not raw:
+        return {"password"}
+    wanted: set[str] = set()
+    for word in raw.split(","):
+        word = word.strip().lower()
+        if not word:
+            continue
+        if word in KNOWN_AUTH_MODES:
+            wanted.add(word)
+        elif word not in _warned_unknown:
+            _warned_unknown.add(word)
+            logger.warning("LOGFLARE_AUTH_MODES: unknown mode ignored: %s", word)
+    return wanted
+
+
+def warn_auth_mode_mismatch() -> None:
+    """시작 시 한 번: Access 설정과 LOGFLARE_AUTH_MODES 가 어긋나 Access 로그인이 꺼져 있으면 알린다."""
+    listed = _listed_modes()
+    configured = load_access_config() is not None
+    if configured and "access" not in listed:
+        logger.warning("Access 설정은 있으나 LOGFLARE_AUTH_MODES 에 access 가 없어 Access 로그인이 꺼져 있습니다")
+    elif not configured and "access" in listed:
+        logger.warning("LOGFLARE_AUTH_MODES 에 access 가 있으나 Access 설정이 덜 채워져 꺼져 있습니다")
+
+
 def effective_auth_modes() -> list[str]:
     """LOGFLARE_AUTH_MODES 중 실제로 켜진 로그인 방식 (["password","access"] 순서). 요청 시점에 읽는다.
 
     비어 있으면 password 만. access 는 Access 설정 세 가지가 모두 있을 때만 유효하다.
     """
-    raw = str(getenvval("LOGFLARE_AUTH_MODES", "") or "").strip()
-    if not raw:
-        wanted = {"password"}
-    else:
-        wanted = set()
-        for word in raw.split(","):
-            word = word.strip().lower()
-            if not word:
-                continue
-            if word in KNOWN_AUTH_MODES:
-                wanted.add(word)
-            else:
-                logger.warning("LOGFLARE_AUTH_MODES: unknown mode ignored: %s", word)
+    wanted = _listed_modes()
     if "access" in wanted and load_access_config() is None:
         logger.debug("LOGFLARE_AUTH_MODES lists access but Access settings are incomplete")
         wanted.discard("access")
