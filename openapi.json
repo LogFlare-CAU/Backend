@@ -1769,7 +1769,7 @@
           "log"
         ],
         "summary": "로그 이벤트 상세",
-        "description": "에러 한 건의 원본(raw)과 같은 그룹의 발생 통계<br>\n<br>\nrecent_ids: 같은 그룹의 최신 ID 최대 10개 (자신 제외, 최신순)<br>\n<br>\n403: 프로젝트 접근 권한 없음, 404: 에러 없음",
+        "description": "에러 한 건의 원본(raw)과 같은 그룹의 발생 통계<br>\n<br>\nrecent_ids: 같은 그룹의 최신 ID 최대 10개 (자신 제외, 최신순)<br>\nrecent: recent_ids 와 같은 행들의 id/timestamp/level (+ 그룹 메시지와 다를 때만 message)<br>\n<br>\n403: 프로젝트 접근 권한 없음, 404: 에러 없음",
         "operationId": "get_event_detail_log_events__error_id__get",
         "security": [
           {
@@ -3548,6 +3548,14 @@
             "type": "array",
             "title": "Recent Ids",
             "description": "같은 그룹의 최신 ID 최대 10개 (자신 제외, 최신순)"
+          },
+          "recent": {
+            "items": {
+              "$ref": "#/components/schemas/RecentOccurrence"
+            },
+            "type": "array",
+            "title": "Recent",
+            "description": "recent_ids 와 같은 행들의 id/시각/레벨 (같은 순서)"
           }
         },
         "type": "object",
@@ -4161,6 +4169,43 @@
           "warning_count"
         ],
         "title": "ProjectSummary"
+      },
+      "RecentOccurrence": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "timestamp": {
+            "type": "string",
+            "title": "Timestamp",
+            "description": "그 행의 발생 시각"
+          },
+          "level": {
+            "type": "string",
+            "title": "Level",
+            "description": "그 행의 레벨 (대문자)"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message",
+            "description": "그룹 메시지와 다를 때만 채워지는 그 행의 메시지"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "timestamp",
+          "level"
+        ],
+        "title": "RecentOccurrence"
       },
       "ResetPasswordParams": {
         "properties": {
