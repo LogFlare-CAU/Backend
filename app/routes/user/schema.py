@@ -61,5 +61,9 @@ UserResponse = make_named_response(User, "UserResponse")
 UserSequenceResponse = make_named_response(Sequence[User], "UserSequenceResponse")
 
 
+class AuthModes(BaseModel):
+    modes: list[str] = Field(..., description='서버가 허용하는 로그인 방식 ("password", "access" 순서)')
+
+
 class AccessAuthParams(BaseModel):
     keep_logged_in: bool = Field(False, description="로그인 상태 유지 여부")

@@ -48,6 +48,33 @@ def load_access_config() -> AccessConfig | None:
     return AccessConfig(team_domain=team, aud=aud, users=users)
 
 
+KNOWN_AUTH_MODES = ("password", "access")
+
+
+def effective_auth_modes() -> list[str]:
+    """LOGFLARE_AUTH_MODES 중 실제로 켜진 로그인 방식 (["password","access"] 순서). 요청 시점에 읽는다.
+
+    비어 있으면 password 만. access 는 Access 설정 세 가지가 모두 있을 때만 유효하다.
+    """
+    raw = str(getenvval("LOGFLARE_AUTH_MODES", "") or "").strip()
+    if not raw:
+        wanted = {"password"}
+    else:
+        wanted = set()
+        for word in raw.split(","):
+            word = word.strip().lower()
+            if not word:
+                continue
+            if word in KNOWN_AUTH_MODES:
+                wanted.add(word)
+            else:
+                logger.warning("LOGFLARE_AUTH_MODES: unknown mode ignored: %s", word)
+    if "access" in wanted and load_access_config() is None:
+        logger.debug("LOGFLARE_AUTH_MODES lists access but Access settings are incomplete")
+        wanted.discard("access")
+    return [m for m in KNOWN_AUTH_MODES if m in wanted]
+
+
 _jwk_clients: dict[str, PyJWKClient] = {}
 
 

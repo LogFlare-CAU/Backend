@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request
 
 from common.schema import APIResponse, StringResponse
 from common.schema import response_maker as r_make
+from common.access import effective_auth_modes
 from common.client_ip import get_client_ip
 from common.sqlsession import get_db
 
@@ -61,7 +62,16 @@ async def get_current_user(request: Request, conn=get_db):
     return APIResponse(data=dict(res))
 
 
-@router.post("/auth", response_model=StringResponse, responses=r_make([401, 429]))
+@router.get("/auth/modes", response_model=APIResponse[schema.AuthModes])
+async def get_auth_modes():
+    """
+    서버가 허용하는 로그인 방식을 반환합니다. 인증이 필요 없습니다.<br>
+    modes 는 "password"(POST /user/auth), "access"(POST /user/auth/access) 중 켜진 것만 이 순서로 담깁니다.<br>
+    """
+    return APIResponse(data={"modes": effective_auth_modes()})
+
+
+@router.post("/auth", response_model=StringResponse, responses=r_make([401, 404, 429]))
 async def authenticate_user(
         request: Request, auth_data: schema.UserAuthParams, conn=get_db
 ):

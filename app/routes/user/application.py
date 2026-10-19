@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 from starlette.status import HTTP_401_UNAUTHORIZED, HTTP_404_NOT_FOUND
 
-from common.access import AccessError, load_access_config, verify_access_jwt
+from common.access import AccessError, effective_auth_modes, load_access_config, verify_access_jwt
 from common.client_ip import get_client_ip
 from common.rate_limit import check_login_rate_limit, reset_login_rate_limit
 from common.security import hash_password, verify_password
@@ -16,6 +16,8 @@ _DUMMY_HASH = hash_password("logflare-unknown-user")
 
 
 async def authenticate_user(conn: AsyncSession, items: schema.UserAuthParams, client_ip: str) -> str:
+    if "password" not in effective_auth_modes():
+        raise HTTPException(HTTP_404_NOT_FOUND)
     rate_limit_key = f"{client_ip}:{items.username}"
     check_login_rate_limit(rate_limit_key)
     try:
@@ -33,7 +35,7 @@ async def authenticate_user(conn: AsyncSession, items: schema.UserAuthParams, cl
 async def authenticate_access(conn: AsyncSession, request: Request, keep_logged_in: bool) -> str:
     """Cloudflare Access JWT 로 로그인. 설정이 없으면 404, 그 외 실패는 모두 401."""
     cfg = load_access_config()
-    if cfg is None:
+    if cfg is None or "access" not in effective_auth_modes():
         raise HTTPException(HTTP_404_NOT_FOUND)
     rate_limit_key = f"access:{get_client_ip(request)}"
     check_login_rate_limit(rate_limit_key)

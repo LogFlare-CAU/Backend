@@ -44,6 +44,7 @@ def access_env(monkeypatch):
     monkeypatch.setenv("LOGFLARE_ACCESS_TEAM_DOMAIN", TEAM)
     monkeypatch.setenv("LOGFLARE_ACCESS_AUD", AUD)
     monkeypatch.setenv("LOGFLARE_ACCESS_USERS", f"{SERVICE}=admin, Me@Example.com=admin")
+    monkeypatch.setenv("LOGFLARE_AUTH_MODES", "password,access")
     monkeypatch.setattr(access, "_get_jwk_client", lambda team: FakeJwkClient())
 
 
