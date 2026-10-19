@@ -29,8 +29,16 @@ async def list_users(conn: AsyncSession) -> Sequence[model.User]:
     return users
 
 
-async def reset_user_password(conn: AsyncSession, useridx: int, new_password: str) -> model.User:
-    """비밀번호 재설정: 해당 사용자의 모든 로그인(과 묶인 FCM)을 끊는다."""
+async def reset_user_password(
+    conn: AsyncSession,
+    useridx: int,
+    new_password: str,
+    current_token_idx: int | None = None,
+) -> model.User:
+    """비밀번호 재설정: 해당 사용자의 모든 로그인(과 묶인 FCM)을 끊는다.
+
+    current_token_idx 는 본인 비밀번호를 재설정할 때만 넘긴다 — 현재 세션은 남긴다.
+    """
     stmt = select(model.User).where(model.User.idx == useridx)
     result = await conn.execute(stmt)
     user = result.scalar_one_or_none()
@@ -39,7 +47,7 @@ async def reset_user_password(conn: AsyncSession, useridx: int, new_password: st
     user.password = hash_password(new_password)
     user.updated_at = datetime.now(UTC)
     conn.add(user)
-    await revoke_user_tokens(conn, user.idx)
+    await revoke_user_tokens(conn, user.idx, keep_idx=current_token_idx)
     await conn.commit()
     await conn.refresh(user)
     return user

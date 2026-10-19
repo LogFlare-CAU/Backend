@@ -172,3 +172,21 @@ async def test_reregister_from_other_login_rebinds(client: AsyncClient, plain_us
     rows = await _rows("tok-1")
     assert len(rows) == 1
     assert rows[0].token_idx == (await _login_row(second)).idx
+
+
+@pytest.mark.asyncio
+async def test_register_racing_logout_is_409(plain_user):
+    """The login token was deleted (logout) after auth but before the commit:
+    the FK fails on both attempts and the caller gets 409."""
+    from fastapi import HTTPException
+
+    from routes.fcm.schema import FCMTokenParams
+
+    async with async_session() as s:
+        with pytest.raises(HTTPException) as exc:
+            await fcm_service.register_fcm_token(
+                s, plain_user[3], FCMTokenParams(fcm_token="raced"), token_idx=99999
+            )
+    assert exc.value.status_code == 409
+    assert exc.value.detail == "FCM token conflict"
+    assert await _rows("raced") == []

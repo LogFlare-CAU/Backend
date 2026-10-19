@@ -133,12 +133,16 @@ async def reset_user_password(
     """
     사용자의 비밀번호를 지정한 값으로 재설정합니다.<br>
     해당 사용자의 모든 로그인 토큰과 그에 묶인 FCM 토큰이 삭제됩니다.<br>
+    본인 비밀번호를 재설정하면 현재 로그인은 유지됩니다.<br>
     로그인 토큰이 필요하며, 관리자 권한이 있어야 합니다.<br>
     <br>
     403: 권한 없음<br>
     404: 사용자를 찾을 수 없음<br>
     """
-    await service.reset_user_password(conn, useridx, item.new_password)
+    own = get_userid(request) == useridx
+    await service.reset_user_password(
+        conn, useridx, item.new_password, current_token_idx=get_token_idx(request) if own else None
+    )
     return APIResponse(data="Password has been reset.")
 
 

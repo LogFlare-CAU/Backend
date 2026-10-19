@@ -1,5 +1,4 @@
 from datetime import UTC, datetime, timedelta
-from functools import partial
 
 from sqlalchemy import select
 
@@ -22,14 +21,11 @@ async def _send_to_recipients(conn, projectid: int, title: str, msg: str, data: 
     project = await project_service.get_project(conn, projectid, True)
     recipients = [1] + [u.user_id for u in project.users if u.user_id != 1 and u.view]
     for user_id in recipients:
-        for fcm in await fcm_service.get_fcm_tokens(conn, user_id):
-            await send_fcm_message(
-                fcm.fcm_token,
-                title,
-                msg,
-                data,
-                onfailure=partial(fcm_service.remove_fcm_token, conn, fcm.fcm_token),
-            )
+        rows = await fcm_service.get_fcm_tokens(conn, user_id)
+        # 프루닝 실패 시 rollback 이 ORM 객체를 만료시키므로 먼저 값을 떼어 둔다
+        targets = [(r.fcm_token, fcm_service.prune_callback(conn, r)) for r in rows]
+        for token, prune in targets:
+            await send_fcm_message(token, title, msg, data, onfailure=prune)
     return project
 
 

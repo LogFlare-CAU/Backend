@@ -3,6 +3,10 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 pythonpath = ["app"]
+filterwarnings = [
+    # firebase_admin: Message.token -> fid 마이그레이션은 추후 (docs/api-v2-additions.md)
+    "ignore:Message.token is deprecated:DeprecationWarning:common.fcm",
+]
 
 [tool.ruff]
 target-version = "py312"

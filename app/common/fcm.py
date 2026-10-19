@@ -30,7 +30,7 @@ def init():
 
 # 이 토큰으로는 다시 보낼 수 없다는 뜻의 오류 — 행을 지운다.
 _DEAD_TOKEN_ERRORS = (messaging.UnregisteredError, messaging.SenderIdMismatchError)
-_ANDROID = messaging.AndroidConfig(priority="high", ttl=timedelta(hours=1))
+_ANDROID = messaging.AndroidConfig(priority="high", ttl=timedelta(hours=24))
 
 
 def _is_dead_token(err: Exception) -> bool:

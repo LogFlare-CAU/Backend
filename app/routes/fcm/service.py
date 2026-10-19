@@ -1,6 +1,7 @@
 import time
 from datetime import UTC, datetime, timedelta
-from typing import Sequence
+from collections.abc import Awaitable
+from typing import Callable, Sequence
 
 from fastapi import HTTPException
 from sqlalchemy import and_, delete, or_, select
@@ -59,15 +60,35 @@ async def register_fcm_token(
     return fcm_token
 
 
-async def remove_fcm_token(conn: AsyncSession, fcm_token: str) -> None:
-    stmt = select(model.FCMToken).where(
-        model.FCMToken.fcm_token == fcm_token,
-    )
-    result = await conn.execute(stmt)
-    token = result.scalars().first()
-    if token:
-        await conn.delete(token)
-        await conn.commit()
+def prune_callback(conn: AsyncSession, row: model.FCMToken) -> Callable[[], Awaitable[None]]:
+    """onfailure callback that deletes exactly the row as it was when fetched.
+
+    The row's state is snapshotted now (a rollback would expire the ORM object),
+    and the delete matches idx, fcm_token and the binding (user, login token,
+    last_delivery): a row re-registered or rebound since the fetch is left alone.
+    A failed commit is rolled back so the shared session stays usable.
+    """
+    snap = (row.idx, row.fcm_token, row.user_idx, row.token_idx, row.last_delivery)
+
+    async def prune() -> None:
+        idx, value, user_idx, token_idx, last_delivery = snap
+        fcm = model.FCMToken
+        try:
+            await conn.execute(
+                delete(fcm).where(
+                    fcm.idx == idx,
+                    fcm.fcm_token == value,
+                    fcm.user_idx == user_idx,
+                    fcm.token_idx.is_not_distinct_from(token_idx),
+                    fcm.last_delivery.is_not_distinct_from(last_delivery),
+                )
+            )
+            await conn.commit()
+        except Exception:
+            await conn.rollback()
+            raise
+
+    return prune
 
 
 async def remove_user_fcm_token(

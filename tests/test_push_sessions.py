@@ -158,6 +158,20 @@ async def test_password_change_via_patch_revokes_other_logins(
 
 
 @pytest.mark.asyncio
+async def test_reset_own_password_keeps_current_login(client: AsyncClient, admin_token: str):
+    other_admin = await _login(client, "admin", "adminpass1", keep=True)
+    await _register(client, admin_token, "admin-here")
+    await _register(client, other_admin, "admin-other")
+    res = await client.post(
+        "/user/1/reset_password", headers=_auth(admin_token), json={"new_password": "newadmin1"}
+    )
+    assert res.status_code == 200, res.text
+    assert await _login_rows(1) == [admin_token]
+    assert await _fcm_rows() == {"admin-here"}
+    assert (await client.get("/user/me", headers=_auth(admin_token))).status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_patch_without_password_keeps_logins(
     client: AsyncClient, admin_token: str, plain_user
 ):

@@ -1,5 +1,4 @@
 from datetime import datetime
-from functools import partial
 
 from fastapi import APIRouter, HTTPException, Request, status
 
@@ -107,12 +106,7 @@ async def test_fcm_notification(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No FCM tokens registered for this user.",
         )
-    for token in fcm_tokens:
-        await send_fcm_message(
-            token.fcm_token,
-            fcm_data.title,
-            fcm_data.body,
-            data,
-            onfailure=partial(service.remove_fcm_token, conn, token.fcm_token),
-        )
+    targets = [(t.fcm_token, service.prune_callback(conn, t)) for t in fcm_tokens]
+    for token, prune in targets:
+        await send_fcm_message(token, fcm_data.title, fcm_data.body, data, onfailure=prune)
     return APIResponse(data={"sent_to": len(fcm_tokens)})
