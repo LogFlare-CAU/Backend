@@ -85,6 +85,17 @@ def test_qr_svg_has_svg_namespace():
     assert not any(t.endswith("script") or t.endswith("foreignobject") for t in tags)
 
 
+def test_qr_svg_scales_with_viewbox():
+    """웹 화면이 CSS 로 줄여 그리므로 고정 width/height 대신 viewBox 가 있어야 잘리지 않는다."""
+    import xml.etree.ElementTree as ET
+
+    from common.access_qr import qr_svg
+
+    root = ET.fromstring(qr_svg('{"v":1,"secret":"' + "s" * 200 + '"}'))
+    assert root.get("viewBox")
+    assert root.get("width") is None and root.get("height") is None
+
+
 def test_mask_client_id():
     from common.access_qr import mask_client_id
 

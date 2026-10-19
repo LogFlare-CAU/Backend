@@ -50,7 +50,9 @@ def qr_svg(payload: str) -> str:
     qr = segno.make(payload, error="m")
     buf = io.BytesIO()
     # svg_inline 은 xmlns 를 빼므로 save(svgns=True) 로 SVG 네임스페이스를 붙인다 (웹 화면이 image/svg+xml 로 파싱)
-    qr.save(buf, kind="svg", xmldecl=False, svgns=True, nl=False, border=2, scale=6, dark="#191F28", light="#FFFFFF")
+    # omitsize: width/height 대신 viewBox 를 써서 웹 화면이 줄여 그릴 때 잘리지 않게 한다
+    qr.save(buf, kind="svg", xmldecl=False, svgns=True, nl=False, border=2, scale=6, omitsize=True,
+            dark="#191F28", light="#FFFFFF")
     return buf.getvalue().decode("utf-8")
 
 
