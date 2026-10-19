@@ -223,6 +223,73 @@
         ]
       }
     },
+    "/user/access-qr": {
+      "get": {
+        "tags": [
+          "user"
+        ],
+        "summary": "Get Access Qr",
+        "description": "앱의 CF Access 로그인용 QR 을 반환합니다. 관리자(100)만 볼 수 있습니다.<br>\nsvg 에만 앱 전용 서비스 토큰 secret 이 담기며, 응답은 캐시되지 않습니다.<br>\n<br>\n401: 인증 실패<br>\n403: 관리자가 아님<br>\n404: 설정 없음 (data.reason = qr_unconfigured, data.missing)<br>\n503: QR 라이브러리 없음 (data.reason = qr_lib_missing)<br>",
+        "operationId": "get_access_qr_user_access_qr_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIResponse_AccessQr_"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "Authorization": []
+          }
+        ]
+      }
+    },
     "/user/auth/modes": {
       "get": {
         "tags": [
@@ -2795,6 +2862,47 @@
         "title": "APIResponse",
         "description": "API 공통 응답 스키마"
       },
+      "APIResponse_AccessQr_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "API 호출 성공 여부",
+            "default": true
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "처리 결과에 대한 메시지",
+            "default": "success"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code",
+            "description": "에러 코드"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccessQr"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "API 호출 결과 데이터"
+          }
+        },
+        "type": "object",
+        "title": "APIResponse[AccessQr]"
+      },
       "APIResponse_AuthModes_": {
         "properties": {
           "success": {
@@ -3057,6 +3165,56 @@
         },
         "type": "object",
         "title": "AccessAuthParams"
+      },
+      "AccessQr": {
+        "properties": {
+          "svg": {
+            "type": "string",
+            "title": "Svg",
+            "description": "앱 로그인용 QR (SVG 문자열). 앱 전용 서비스 토큰 secret 은 여기에만 담긴다"
+          },
+          "server": {
+            "type": "string",
+            "title": "Server",
+            "description": "LogFlare 공개 주소"
+          },
+          "clientId": {
+            "type": "string",
+            "title": "Clientid",
+            "description": "서비스 토큰 client ID 앞 4·뒤 4 글자"
+          },
+          "mapped": {
+            "type": "boolean",
+            "title": "Mapped",
+            "description": "이 client ID 가 LOGFLARE_ACCESS_USERS 에 있고 그 사용자가 DB 에 있는가"
+          },
+          "mappedReason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mappedreason",
+            "description": "mapped 가 false 일 때: \"not_in_map\" | \"user_missing\""
+          },
+          "accessEnabled": {
+            "type": "boolean",
+            "title": "Accessenabled",
+            "description": "Access 로그인이 켜져 있는가"
+          }
+        },
+        "type": "object",
+        "required": [
+          "svg",
+          "server",
+          "clientId",
+          "mapped",
+          "accessEnabled"
+        ],
+        "title": "AccessQr"
       },
       "AuthModes": {
         "properties": {
