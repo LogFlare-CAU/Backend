@@ -48,12 +48,17 @@ async def lifespan(app: FastAPI):
     docker_url = getenvval("LOGFLARE_DOCKER_URL", "")
     docker = DockerClient(docker_url) if docker_url else None
     task = asyncio.create_task(run_collector(docker)) if docker else None
-    yield
-    # 앱 종료 시 정리 작업
-    if task:
-        task.cancel()
-        await asyncio.gather(task, return_exceptions=True)
-        await docker.aclose()
+    try:
+        yield
+    finally:
+        # 앱 종료 시 정리 작업 — 수집기 취소가 어떻게 끝나든 HTTP 클라이언트는 닫는다
+        try:
+            if task:
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+        finally:
+            if docker:
+                await docker.aclose()
 
 root_path = getenvval("LOGFLARE_API_ROOT_PATH", "")
 app = FastAPI(title=title, version=version, description=description, lifespan=lifespan, root_path=root_path, docs_url=None, redoc_url=None, openapi_url=None)

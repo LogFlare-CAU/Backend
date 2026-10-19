@@ -66,9 +66,9 @@ def _backfill(bind) -> None:
         bind.execute(
             sa.text(
                 "INSERT INTO error_groups (fingerprint, project_id, level, errortype, sample, first_seen, last_seen, count, ignored) "
-                "VALUES (:fingerprint, :project_id, :level, :errortype, :sample, :first_seen, :last_seen, :count, 0)"
-            ),
-            list(groups.values()),
+                "VALUES (:fingerprint, :project_id, :level, :errortype, :sample, :first_seen, :last_seen, :count, :ignored)"
+            ).bindparams(sa.bindparam("ignored", type_=sa.Boolean())),
+            [{**g, "ignored": False} for g in groups.values()],
         )
 
 

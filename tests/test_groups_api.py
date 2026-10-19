@@ -41,6 +41,7 @@ async def test_group_sort_and_ignore(client, admin_token):
     items = (await client.get("/group?sort=count", headers=h)).json()["data"]
     assert [g["count"] for g in items] == [5, 3, 1]
     assert items[0]["project_name"] == "proj-s"
+    assert items[0]["headline"] and "\n" not in items[0]["headline"]
     new = (await client.get("/group?sort=new", headers=h)).json()["data"]
     assert [g["count"] for g in new] == [1, 3, 5]
     gid = items[0]["id"]

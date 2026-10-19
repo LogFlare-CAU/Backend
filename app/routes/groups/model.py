@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, Text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, Text, UniqueConstraint
 
 from common.basemodel import Base
 
@@ -28,3 +28,21 @@ class CollectorCursor(Base):
 
     container = Column(Text, primary_key=True, comment="컨테이너 이름 (이벤트는 __events__)")
     last_ts = Column(DateTime, nullable=False, comment="마지막으로 읽은 시각")
+    pending = Column(
+        Text, nullable=True, comment="아직 끝나지 않은 줄 JSON [[iso 시각, 줄], ...] — 다음 폴링에 이어 붙인다"
+    )
+
+
+class ContainerEvent(Base):
+    __tablename__ = "container_events"
+    __table_args__ = (UniqueConstraint("container", "event", "at", name="uq_container_events_key"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True, comment="ID")
+    container = Column(Text, nullable=False, comment="컨테이너 이름")
+    event = Column(Text, nullable=False, comment="die / oom / unhealthy / restart")
+    at = Column(DateTime, nullable=False, index=True, comment="이벤트 시각 (naive UTC)")
+    detail = Column(Text, nullable=False, default="", comment="설명")
+    project_id = Column(
+        Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=True, comment="Project ID"
+    )
+    pushed_at = Column(DateTime, nullable=True, comment="푸시를 보낸 시각 (쿨다운 판단)")

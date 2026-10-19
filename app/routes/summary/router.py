@@ -10,7 +10,8 @@ from common.schema import APIResponse
 from common.timeutil import utc_iso as _iso
 from common.sqlsession import get_db
 from routes.collector import collector
-from routes.groups.model import ErrorGroup
+from routes.collector.parse import headline
+from routes.groups.model import ContainerEvent, ErrorGroup
 from routes.logs.model import Errorlog
 from routes.projects.model import Project
 
@@ -56,6 +57,14 @@ async def summary(request: Request, conn=get_db):
             .limit(5)
         )
     ).all()
+    events = (
+        await conn.execute(
+            select(ContainerEvent)
+            .where(ContainerEvent.at >= since)
+            .order_by(ContainerEvent.at.desc(), ContainerEvent.id.desc())
+            .limit(50)
+        )
+    ).scalars().all()
     state = collector.collector_state
     last_at = state.get("last_at")
     ok = bool(state.get("ok") and last_at and now - last_at <= timedelta(seconds=60))
@@ -66,15 +75,15 @@ async def summary(request: Request, conn=get_db):
             "topGroups": [
                 {
                     "container": name,
-                    "message": (g.sample.splitlines() or [""])[0][:120],
+                    "message": headline(g.sample)[:120],
                     "count24h": n,
                     "lastSeen": _iso(g.last_seen),
                 }
                 for g, name, n in rows
             ],
             "containerEvents24h": [
-                {"container": e["container"], "event": e["event"], "at": _iso(e["at"])}
-                for e in reversed(collector.container_events)
+                {"container": e.container, "event": e.event, "at": _iso(e.at)}
+                for e in events
             ],
             "collectorOk": ok,
             "lastCollectedAt": _iso(last_at) if last_at else None,

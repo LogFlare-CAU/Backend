@@ -21,8 +21,17 @@ def sent(monkeypatch):
         calls.append(args)
 
     monkeypatch.setattr(tasks, "send_fcm_message", fake)
-    tasks._last_event_push.clear()
     return calls
+
+
+async def _event(pid, ev, at, container="web"):
+    from routes.groups.model import ContainerEvent
+
+    async with async_session() as s:
+        row = ContainerEvent(container=container, event=ev, at=at.replace(tzinfo=None), detail="exit 1", project_id=pid)
+        s.add(row)
+        await s.commit()
+        return row.id
 
 
 @pytest_asyncio.fixture(autouse=True)
@@ -78,12 +87,36 @@ async def test_ignored_group_never_notifies(client, project_with_key, sent):
 async def test_container_event_cooldown(client, project_with_key, sent):
     pid = project_with_key[2]
     t0 = datetime.now(UTC)
-    n = lambda ev, at: tasks.notify_container_event(pid, "web", ev, at, "exit 1")  # noqa: E731
-    assert await n("die", t0) is True
-    assert await n("die", t0) is False
-    assert await n("die", t0 + timedelta(minutes=11)) is True
-    assert await n("oom", t0) is True
+    first = await _event(pid, "die", t0)
+    assert await tasks.notify_container_event(first) is True
+    assert await tasks.notify_container_event(first) is False  # 같은 이벤트 두 번
+    assert await tasks.notify_container_event(await _event(pid, "die", t0 + timedelta(minutes=3))) is False
+    assert await tasks.notify_container_event(await _event(pid, "die", t0 + timedelta(minutes=11))) is True
+    assert await tasks.notify_container_event(await _event(pid, "oom", t0)) is True
     assert len(sent) == 3
+
+
+@pytest.mark.asyncio
+async def test_container_event_failed_send_not_recorded(client, project_with_key, monkeypatch):
+    """보내기에 실패하면 쿨다운을 기록하지 않아 다음 이벤트가 막히지 않는다."""
+    pid = project_with_key[2]
+    t0 = datetime.now(UTC)
+
+    async def boom(*a, **k):
+        raise RuntimeError("fcm down")
+
+    monkeypatch.setattr(tasks, "send_fcm_message", boom)
+    first = await _event(pid, "die", t0)
+    with pytest.raises(RuntimeError):
+        await tasks.notify_container_event(first)
+    sent = []
+
+    async def ok(*a, **k):
+        sent.append(a)
+
+    monkeypatch.setattr(tasks, "send_fcm_message", ok)
+    assert await tasks.notify_container_event(await _event(pid, "die", t0 + timedelta(seconds=30))) is True
+    assert len(sent) == 1
 
 
 @pytest.mark.asyncio
@@ -103,5 +136,5 @@ async def test_container_event_timestamp_naive(sent):
         s.add(Project(name="web", token=None))
         await s.commit()
         pid = (await s.execute(select(Project.id).where(Project.name == "web"))).scalar_one()
-    await tasks.notify_container_event(pid, "web", "die", at, "exit code 1")
+    await tasks.notify_container_event(await _event(pid, "die", at))
     assert sent[0][3]["timestamp"] == "2026-10-18T12:00:00"

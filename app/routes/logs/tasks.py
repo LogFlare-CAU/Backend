@@ -6,7 +6,7 @@ from common.fcm import send_fcm_message
 from common.logger_setup import get_logger
 from common.sqlsession import async_session
 from routes.fcm import service as fcm_service
-from routes.groups.model import ErrorGroup
+from routes.groups.model import ContainerEvent, ErrorGroup
 from routes.projects import service as project_service
 
 from . import model
@@ -14,11 +14,13 @@ from . import model
 logger = get_logger()
 
 _MAX_MSG = 1000  # FCM data 는 4096 바이트 제한 — 트레이스백 전체를 싣지 않는다
+EVENT_COOLDOWN = timedelta(minutes=10)  # 같은 컨테이너·같은 이벤트는 이 안에 한 번만 푸시
 
 
-async def _send_to_recipients(conn, projectid: int, title: str, msg: str, data: dict):
-    """superuser(id 1) 와 view 권한 있는 프로젝트 사용자에게 보낸다."""
-    project = await project_service.get_project(conn, projectid, True)
+async def _send_to_recipients(conn, project, title: str, msg: str, data: dict):
+    """superuser(id 1) 와 view 권한 있는 프로젝트 사용자에게 보낸다. project 는 Project 또는 id."""
+    if isinstance(project, int):
+        project = await project_service.get_project(conn, project, True)
     recipients = [1] + [u.user_id for u in project.users if u.user_id != 1 and u.view]
     for user_id in recipients:
         rows = await fcm_service.get_fcm_tokens(conn, user_id)
@@ -49,6 +51,8 @@ async def notify_error(error_id: int, projectid: int, is_new: bool, test: bool =
             if group is not None and group.ignored:
                 return
             project = await project_service.get_project(conn, projectid, True)
+            # 프루닝이 commit/rollback 하면 ORM 값이 만료되므로 보내기 전에 떼어 둔다
+            title = f"Error in project {project.name}"
             text = error.message[:_MAX_MSG]
             msg = (
                 f"Error ID: {error.id}\nMessage: {text}\n"
@@ -63,9 +67,7 @@ async def notify_error(error_id: int, projectid: int, is_new: bool, test: bool =
                 "projectid": str(projectid),
                 "test": "true" if test else "false",
             }
-            await _send_to_recipients(
-                conn, projectid, f"Error in project {project.name}", msg, data
-            )
+            await _send_to_recipients(conn, project, title, msg, data)
             await conn.commit()
         except Exception:
             await conn.rollback()
@@ -73,38 +75,51 @@ async def notify_error(error_id: int, projectid: int, is_new: bool, test: bool =
             raise
 
 
-# ponytail: 프로세스 메모리 쿨다운, 재시작하면 초기화 — 프로세스 1개라 충분
-_last_event_push: dict[tuple[str, str], datetime] = {}
-_COOLDOWN = timedelta(minutes=10)
+async def notify_container_event(event_id: int) -> bool:
+    """컨테이너 장애(die/oom/unhealthy) 푸시. 이미 보냈거나 쿨다운 중이면 False.
 
-
-async def notify_container_event(
-    project_id: int, container: str, event: str, at: datetime, detail: str
-) -> bool:
-    """컨테이너 장애(die/oom/unhealthy) 푸시. 쿨다운 중이면 False."""
-    key = (container, event)
-    last = _last_event_push.get(key)
-    if last is not None and at - last < _COOLDOWN:
-        return False
-    _last_event_push[key] = at
-    message = f"{container} {event}: {detail}"
-    data = {
-        "errorid": "0",
-        "type": f"container.{event}",
-        "level": "CRITICAL",
-        "timestamp": (at.astimezone(UTC).replace(tzinfo=None) if at.tzinfo else at).isoformat(),
-        "message": message,
-        "projectid": str(project_id),
-        "test": "false",
-    }
+    쿨다운은 DB 의 pushed_at 으로 판단하므로 재시작해도 이어지고, 보내기에 성공한 뒤에만 기록한다.
+    """
     async with async_session() as conn:
         try:
-            project = await project_service.get_project(conn, project_id, True)
-            await _send_to_recipients(
-                conn, project_id, f"Container {event} in {project.name}", message, data
+            ev = await conn.get(ContainerEvent, event_id)
+            if ev is None or ev.pushed_at is not None or ev.project_id is None:
+                return False
+            recent = await conn.scalar(
+                select(ContainerEvent.id)
+                .where(
+                    ContainerEvent.container == ev.container,
+                    ContainerEvent.event == ev.event,
+                    ContainerEvent.pushed_at.is_not(None),
+                    ContainerEvent.at > ev.at - EVENT_COOLDOWN,
+                    ContainerEvent.at < ev.at + EVENT_COOLDOWN,
+                )
+                .limit(1)
             )
+            if recent is not None:
+                return False
+            project = await project_service.get_project(conn, ev.project_id, True)
+            container, event, at = ev.container, ev.event, ev.at
+            message = f"{container} {event}: {ev.detail}"
+            data = {
+                "errorid": "0",
+                "type": f"container.{event}",
+                "level": "CRITICAL",
+                "timestamp": at.isoformat(),
+                "message": message,
+                "projectid": str(ev.project_id),
+                "test": "false",
+            }
+            await _send_to_recipients(
+                conn, project, f"Container {event} in {project.name}", message, data
+            )
+            await conn.commit()  # 프루닝 결과
+            ev = await conn.get(ContainerEvent, event_id)
+            ev.pushed_at = datetime.now(UTC).replace(tzinfo=None)
             await conn.commit()
         except Exception:
             await conn.rollback()
             raise
     return True
+
+

@@ -11,7 +11,7 @@ from common.sqlsession import async_session
 from routes.collector import collector
 from routes.collector.collector import collect_once, collector_state, purge_old, run_collector
 from routes.collector.docker import DockerClient
-from routes.groups.model import ErrorGroup
+from routes.groups.model import ContainerEvent, ErrorGroup
 from routes.logs import tasks
 from routes.logs.model import Errorlog
 from routes.projects.model import Project
@@ -66,8 +66,25 @@ def quiet(monkeypatch):
         pass
 
     monkeypatch.setattr(tasks, "send_fcm_message", fake)
-    tasks._last_event_push.clear()
-    collector.container_events.clear()
+
+
+async def _stored_events():
+    async with async_session() as s:
+        rows = (await s.execute(select(ContainerEvent).order_by(ContainerEvent.id))).scalars().all()
+    return [r.event for r in rows]
+
+
+def _capture(monkeypatch):
+    calls = []
+
+    async def fake(event_id):
+        async with async_session() as s:
+            ev = await s.get(ContainerEvent, event_id)
+        calls.append((ev.container, ev.event, ev.at))
+        return True
+
+    monkeypatch.setattr(collector, "notify_container_event", fake)
+    return calls
 
 
 async def _count(model):
@@ -137,13 +154,7 @@ async def test_masked_before_store():
 
 
 async def test_events_notify_die_nonzero_only(monkeypatch):
-    calls = []
-
-    async def fake(project_id, container, event, at, detail):
-        calls.append((container, event))
-        return True
-
-    monkeypatch.setattr(collector, "notify_container_event", fake)
+    calls = _capture(monkeypatch)
 
     def ev(action, **attrs):
         return json.dumps(
@@ -155,8 +166,8 @@ async def test_events_notify_die_nonzero_only(monkeypatch):
         + ev("health_status: unhealthy") + ev("health_status: healthy")
     )
     await collect_once(make_docker({}, events=events), NOW)
-    assert calls == [("web", "die"), ("web", "unhealthy")]
-    assert [e["event"] for e in collector.container_events] == ["die", "unhealthy"]
+    assert [(c, e) for c, e, _ in calls] == [("web", "die"), ("web", "unhealthy")]
+    assert await _stored_events() == ["die", "unhealthy"]
 
 
 async def test_docker_error_keeps_loop_alive():
@@ -204,27 +215,15 @@ def _ev(action, age, **attrs):
 
 
 async def test_old_events_recorded_but_not_pushed(monkeypatch):
-    calls = []
-
-    async def fake(project_id, container, event, at, detail):
-        calls.append(at)
-        return True
-
-    monkeypatch.setattr(collector, "notify_container_event", fake)
+    calls = _capture(monkeypatch)
     events = _ev("die", 7200, exitCode="1") + _ev("die", 5, exitCode="137")
     await collect_once(make_docker({}, events=events), NOW)
-    assert len(collector.container_events) == 2
+    assert len(await _stored_events()) == 2
     assert len(calls) == 1
 
 
 async def test_container_failure_isolated(monkeypatch):
-    calls = []
-
-    async def fake(*a):
-        calls.append(a)
-        return True
-
-    monkeypatch.setattr(collector, "notify_container_event", fake)
+    calls = _capture(monkeypatch)
 
     def handler(req):
         p = req.url.path
@@ -252,7 +251,7 @@ async def test_notify_failure_still_advances_events_cursor(monkeypatch):
     async with async_session() as s:
         cur = await s.get(collector.CollectorCursor, "__events__")
     assert cur.last_ts == NOW.replace(tzinfo=None)
-    assert len(collector.container_events) == 1
+    assert len(await _stored_events()) == 1
 
 
 async def test_logs_raw_tty_and_crlf():
@@ -282,18 +281,12 @@ async def test_fresh_new_group_pushed(monkeypatch):
 
 
 async def test_restart_recorded_not_pushed(monkeypatch):
-    calls = []
-
-    async def fake(*a):
-        calls.append(a)
-        return True
-
-    monkeypatch.setattr(collector, "notify_container_event", fake)
+    calls = _capture(monkeypatch)
     reqs = []
     d = make_docker({}, events=_ev("restart", 5), requests=reqs)
     await collect_once(d, NOW)
     assert calls == []
-    assert [e["event"] for e in collector.container_events] == ["restart"]
+    assert await _stored_events() == ["restart"]
     ev_req = next(r for r in reqs if r.url.path == "/events")
     assert "restart" in ev_req.url.params["filters"]
 
@@ -314,3 +307,115 @@ async def test_event_for_new_container_pushes_after_project_commit(monkeypatch):
     assert len(sent) == 1
     async with async_session() as s:
         assert (await s.execute(select(Project).where(Project.name == "brandnew"))).scalar_one()
+
+
+# --- #31: 폴링 경계·재읽기에서 두 번 푸시하지 않기 ---
+
+
+def _body_at(pairs):
+    """[(datetime, line)] -> docker 로그 바이트"""
+    return b"".join(frame(1, f"{ts.strftime('%Y-%m-%dT%H:%M:%S.%f')}000Z {ln}" + chr(10)) for ts, ln in pairs)
+
+
+class _Logs:
+    """폴링마다 새로 붙은 줄만 돌려주는 가짜 docker (since 필터를 흉내)."""
+
+    def __init__(self):
+        self.lines = []
+
+    def docker(self):
+        def handler(req):
+            p = req.url.path
+            if p == "/containers/json":
+                return httpx.Response(200, json=[{"Id": "i1", "Names": ["/api"]}])
+            if p == "/events":
+                return httpx.Response(200, content=b"")
+            since = float(req.url.params["since"])
+            return httpx.Response(200, content=_body_at([(t, ln) for t, ln in self.lines if t.timestamp() >= since]))
+
+        return DockerClient("http://docker", transport=httpx.MockTransport(handler))
+
+
+async def test_traceback_split_across_polls_is_one_group_one_push(monkeypatch):
+    pushes = []
+
+    async def fake(*a, **k):
+        pushes.append(a)
+
+    monkeypatch.setattr(collector, "notify_error", fake)
+    src = _Logs()
+    t = NOW - timedelta(seconds=1)
+    src.lines += [(t, "ERROR:    Exception in ASGI application"), (t, TB[0]), (t, TB[1])]
+    await collect_once(src.docker(), NOW)
+    assert pushes == [] and await _count(ErrorGroup) == 0  # 아직 끝나지 않음 — 보관
+    later = NOW + timedelta(seconds=5)
+    src.lines += [(later - timedelta(seconds=1), TB[2]), (later - timedelta(seconds=1), TB[3]),
+                  (later - timedelta(seconds=1), "INFO:     next request")]
+    await collect_once(src.docker(), later)
+    async with async_session() as s:
+        groups = (await s.execute(select(ErrorGroup))).scalars().all()
+    assert len(groups) == 1 and groups[0].errortype == "TossAPIError"
+    assert groups[0].sample.startswith("ERROR:    Exception in ASGI application")
+    assert len(pushes) == 1
+
+
+async def test_pending_flushed_after_grace(monkeypatch):
+    pushes = []
+
+    async def fake(*a, **k):
+        pushes.append(a)
+
+    monkeypatch.setattr(collector, "notify_error", fake)
+    src = _Logs()
+    t = NOW - timedelta(seconds=1)
+    src.lines += [(t, ln) for ln in TB]  # 예외 줄까지 왔지만 체인이 올 수 있어 잠깐 보관
+    await collect_once(src.docker(), NOW)
+    assert await _count(ErrorGroup) == 0
+    await collect_once(src.docker(), NOW + timedelta(seconds=5))  # 새 줄 없음, 유예 지남
+    assert await _count(ErrorGroup) == 1 and len(pushes) == 1
+    await collect_once(src.docker(), NOW + timedelta(seconds=10))
+    assert await _count(Errorlog) == 1 and len(pushes) == 1
+
+
+async def test_pending_survives_restart():
+    src = _Logs()
+    t = NOW - timedelta(seconds=1)
+    src.lines += [(t, TB[0]), (t, TB[1])]
+    await collect_once(src.docker(), NOW)
+    async with async_session() as s:
+        cur = await s.get(collector.CollectorCursor, "api")
+        assert cur.pending and "Traceback" in cur.pending
+    src.lines += [(NOW + timedelta(seconds=2), TB[2]), (NOW + timedelta(seconds=2), TB[3]),
+                  (NOW + timedelta(seconds=2), "INFO next")]
+    await collect_once(src.docker(), NOW + timedelta(seconds=4))  # 새 DockerClient·새 assembler
+    assert await _count(Errorlog) == 1
+    async with async_session() as s:
+        assert (await s.get(collector.CollectorCursor, "api")).pending is None
+
+
+async def test_unfinished_frames_wait_longer_then_flush():
+    src = _Logs()
+    t = NOW - timedelta(seconds=1)
+    src.lines += [(t, TB[0]), (t, TB[1])]
+    await collect_once(src.docker(), NOW)
+    await collect_once(src.docker(), NOW + timedelta(seconds=10))
+    assert await _count(Errorlog) == 0  # 프레임 중간은 30초까지 기다린다
+    await collect_once(src.docker(), NOW + timedelta(seconds=31))
+    assert await _count(Errorlog) == 1
+
+
+async def test_same_event_read_twice_pushes_once(monkeypatch):
+    calls = _capture(monkeypatch)
+    events = _ev("die", 5, exitCode="1")
+    await collect_once(make_docker({}, events=events + events), NOW)
+    await collect_once(make_docker({}, events=events), NOW + timedelta(seconds=5))  # 커서 경계에서 다시 읽힘
+    assert len(calls) == 1 and await _stored_events() == ["die"]
+
+
+async def test_events_kept_in_db_for_summary():
+    await collect_once(make_docker({}, events=_ev("die", 5, exitCode="1") + _ev("restart", 4)), NOW)
+    assert await _stored_events() == ["die", "restart"]
+    async with async_session() as s:
+        await purge_old(s, NOW + timedelta(days=1))
+        await s.commit()
+    assert await _stored_events() == []

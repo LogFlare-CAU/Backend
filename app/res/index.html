@@ -17,11 +17,12 @@ h1 { font-size:1.25rem; margin:0 0 12px }
 .bar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:12px }
 .bar .grow { flex:1 1 auto }
 .login { display:flex; flex-direction:column; gap:8px; max-width:320px; margin:48px auto }
-.g { border-bottom:1px solid var(--color-border); padding:10px 0; cursor:pointer }
+.g { border-bottom:1px solid var(--color-border); padding:10px 0 }
 .g:last-child { border-bottom:0 }
 .g-top { display:flex; gap:8px; align-items:center; flex-wrap:wrap; font-size:.85rem; color:var(--color-muted) }
 .g-top .cnt { margin-left:auto; font-variant-numeric:tabular-nums; color:var(--color-text) }
-.g-msg { margin:4px 0 0; overflow-wrap:anywhere; word-break:break-word }
+.g-msg { display:block; width:100%; margin:4px 0 0; padding:0; border:0; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; overflow-wrap:anywhere; word-break:break-word }
+.g-msg:focus-visible { outline:2px solid var(--color-accent); outline-offset:2px; border-radius:4px }
 .g.ign .g-msg { opacity:.5 }
 .detail { margin-top:8px; cursor:default }
 .detail pre { margin:6px 0 0; padding:8px; background:var(--color-surface-2); border-radius:6px; white-space:pre-wrap; overflow-wrap:anywhere; overflow-x:auto; max-width:100%; box-sizing:border-box; font-size:.8rem }
@@ -98,25 +99,27 @@ h1 { font-size:1.25rem; margin:0 0 12px }
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
   const firstLine = s => (s || '').split('\n')[0];
 
+  // 행 = 정보 줄(무시 버튼) + 메시지 버튼. 버튼 안에 버튼을 두지 않아 Enter·Space 가 기본 동작으로 된다.
   function row(g) {
     const d = el('div', 'g' + (g.ignored ? ' ign' : ''));
-    d.tabIndex = 0; d.setAttribute('role', 'button');
-    d.onkeydown = e => { if (e.key === 'Enter' && e.target === d) d.onclick(); };
     const top = el('div', 'g-top');
     top.append(el('span', null, g.project_name), el('span', 'badge badge-warn', g.level),
       el('span', null, rel(g.last_seen)), el('span', 'cnt', g.count + '회'));
     const tog = el('button', 'btn btn-ghost', g.ignored ? '무시 해제' : '무시');
-    tog.onclick = ev => { ev.stopPropagation(); guard(async () => {
+    tog.onclick = () => guard(async () => {
       await api('group/' + g.id, { method: 'PATCH', body: JSON.stringify({ ignored: !g.ignored }) });
       await load(true);
-    }); };
+    });
     top.append(tog);
-    d.append(top, el('p', 'g-msg', firstLine(g.sample)));
+    const msg = el('button', 'g-msg', g.headline || firstLine(g.sample));
+    msg.type = 'button';
+    msg.setAttribute('aria-expanded', 'false');
+    d.append(top, msg);
     let det = null;
-    d.onclick = () => {
-      if (det) { det.remove(); det = null; return; }
+    msg.onclick = () => {
+      if (det) { det.remove(); det = null; msg.setAttribute('aria-expanded', 'false'); return; }
       det = el('div', 'detail', '불러오는 중…');
-      det.onclick = e => e.stopPropagation();
+      msg.setAttribute('aria-expanded', 'true');
       d.append(det);
       guard(async () => {
         const full = await api('group/' + g.id);
@@ -139,7 +142,11 @@ h1 { font-size:1.25rem; margin:0 0 12px }
     if ($('proj').value) q.set('project_id', $('proj').value);
     let items;
     try { items = await api('group?' + q); }
-    catch (e) { if (my === seq && !reset) $('more').hidden = false; throw e; }
+    catch (e) {
+      // 새로 불러오기(정렬·필터 변경)에 실패하면 이전 조건의 목록을 남기지 않는다 — 다른 조건 결과로 오해한다.
+      if (my === seq) { if (reset) { $('list').replaceChildren(); offset = 0; } else $('more').hidden = false; }
+      throw e;
+    }
     if (my !== seq) return;
     if (reset) $('list').replaceChildren();
     for (const g of items) $('list').append(row(g));
@@ -150,12 +157,13 @@ h1 { font-size:1.25rem; margin:0 0 12px }
 
   async function init() {
     showApp();
+    // 컨테이너 목록을 못 불러와도 묶음 목록은 따로 불러온다.
     await guard(async () => {
       const ps = await api('project/');
       $('proj').length = 1;
       for (const p of ps) { const o = el('option', null, p.name); o.value = p.id; $('proj').append(o); }
-      await load(true);
     });
+    if (!$('app').hidden) await guard(() => load(true));
   }
 
   document.querySelectorAll('.tab').forEach(b => b.onclick = () => {

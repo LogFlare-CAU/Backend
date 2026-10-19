@@ -3,6 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.timeutil import utc_dict
+from routes.collector.parse import headline
 from routes.logs.model import Errorlog
 from routes.projects.model import Project
 
@@ -10,7 +11,7 @@ from .model import ErrorGroup
 
 
 def _row(group: ErrorGroup, project_name: str) -> dict:
-    return {**utc_dict(group), "project_name": project_name}
+    return {**utc_dict(group), "project_name": project_name, "headline": headline(group.sample)}
 
 
 async def list_groups(
