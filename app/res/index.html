@@ -82,13 +82,20 @@ dialog#qrd { max-width:min(92vw,420px); border:1px solid var(--color-border); bo
   };
 
   class AuthError extends Error {}
+  // 요청을 보낸 뒤 세션(토큰)이 바뀌었다 — 로그아웃·재로그인. 응답은 성공이든 실패든 버리고 호출자는 조용히 끝낸다.
+  class StaleError extends Error {}
   async function api(path, opts = {}) {
     const headers = { 'Content-Type': 'application/json' };
     const t = store.get();
     if (t) headers.Authorization = 'Bearer ' + t;
-    const r = await fetch(base + path, { ...opts, headers });
+    const stale = () => !!t && store.get() !== t;
+    let r;
+    try { r = await fetch(base + path, { ...opts, headers }); }
+    catch (e) { throw stale() ? new StaleError() : e; }
+    if (stale()) throw new StaleError();
     if ((r.status === 400 || r.status === 401) && path !== 'user/auth') throw new AuthError();
     const j = await r.json().catch(() => ({}));
+    if (stale()) throw new StaleError();
     if (!r.ok) { const e = new Error(j.message || j.detail || ('HTTP ' + r.status)); e.status = r.status; e.data = j.data; throw e; }
     return j.data;
   }
@@ -115,7 +122,7 @@ dialog#qrd { max-width:min(92vw,420px); border:1px solid var(--color-border); bo
   function showApp() { $('login').hidden = true; $('app').hidden = false; }
   async function guard(fn) {
     try { await fn(); $('msg').textContent = ''; }
-    catch (e) { if (e instanceof AuthError) showLogin(); else $('msg').textContent = e.message; }
+    catch (e) { if (e instanceof StaleError) return; if (e instanceof AuthError) showLogin(); else $('msg').textContent = e.message; }
   }
 
   function rel(iso) {
@@ -188,7 +195,7 @@ dialog#qrd { max-width:min(92vw,420px); border:1px solid var(--color-border); bo
   // 관리자(permission 100)에게만 버튼을 보인다. 서버도 403 으로 막는다. 실패하면 그냥 숨긴 채 둔다.
   async function showQrButton() {
     try { const me = await api('user/me'); $('qrb').hidden = me.permission !== 100; }
-    catch (e) { if (e instanceof AuthError) showLogin(); }
+    catch (e) { if (e instanceof AuthError) showLogin(); } // StaleError 는 버린다
   }
 
   // 서버가 준 SVG 문자열은 innerHTML 이 아니라 DOMParser 로 파싱해 svg 요소만 가져온다.
@@ -222,7 +229,7 @@ dialog#qrd { max-width:min(92vw,420px); border:1px solid var(--color-border); bo
       if (!d.accessEnabled) w.push('Access 로그인이 꺼져 있어 앱으로 찍어도 로그인되지 않습니다.');
       $('qrwarn').textContent = w.join(' ');
     } catch (e) {
-      if (my !== qrSeq || !$('qrd').open) return;
+      if (e instanceof StaleError || my !== qrSeq || !$('qrd').open) return;
       if (e instanceof AuthError) return showLogin();
       const dd = e.data || {};
       if (e.status === 404 && dd.reason === 'qr_unconfigured') $('qrwarn').textContent = 'QR 기능이 꺼져 있습니다. 서버 설정이 빠졌습니다: ' + (dd.missing || []).join(', ');
