@@ -107,3 +107,13 @@ Items no longer include `raw` (use `GET /log/events/{id}`) or the `project` / `l
 ### `GET /log/{project_id}/{logfileid}`
 
 Unchanged. Still reads a registered log file.
+
+## Release: user permission guards
+
+Server-side enforcement of the permission hierarchy on user management (the Android app already hides these actions). "Caller" is the authenticated user, "target" the user being acted on. Violations return `403` with the usual error envelope (`message` explains why); a missing target still returns `404` first.
+
+* `PATCH /user/{idx}`, `POST /user/{idx}/reset_password`, `DELETE /user/{idx}`: allowed only if `target.permission < caller.permission`. So an Admin (80) can no longer edit, reset or delete the Super Admin (100) or another Admin; a Super Admin can manage Admins and Members.
+* Self: `DELETE` on yourself is `403`. `PATCH` on yourself may change only `username` / `password`; sending a `permission` different from your current one is `403` (the unchanged value is ignored). `reset_password` on yourself is still allowed and keeps the current login.
+* Any `permission` set through `POST /user/` or `PATCH /user/{idx}` must be `<=` the caller's own and `< 100`. Nobody can create or promote a Super Admin through the API. An Admin can still create Admins (80) and Members (0).
+* Behavior change: `permission: 100` used to fail with `422` (schema validation); it is now `403`. A `permission` above the caller's is also `403`. Other invalid values (below 0) are still `422`.
+* Project permission endpoints (`/project/perm...`) only grant per-project access and do not change a user's global permission, so they are unchanged.

@@ -118,6 +118,7 @@ async def create_user(
     403: 권한 없음<br>
     409: 이미 존재하는 사용자<br>
     """
+    service.assert_can_assign_permission(request.state.user, user_data.permission)
     res = await service.create_user(conn, user_data)
     return APIResponse(data=dict(res))
 
@@ -139,6 +140,8 @@ async def reset_user_password(
     403: 권한 없음<br>
     404: 사용자를 찾을 수 없음<br>
     """
+    target = await service.get_user_byid(conn, useridx)  # 404 first
+    service.assert_can_manage(request.state.user, target, allow_self=True)
     own = get_userid(request) == useridx
     await service.reset_user_password(
         conn, useridx, item.new_password, current_token_idx=get_token_idx(request) if own else None
@@ -163,10 +166,11 @@ async def update_user(
     이 요청을 보낸 로그인은 유지됩니다.<br>
     로그인 토큰이 필요하며, 관리자 권한이 있어야 합니다.<br>
     <br>
-    403: 권한 없음<br>
+    403: 권한 없음 (자신보다 같거나 높은 등급 대상, 자신의 권한 변경, 자신보다 높거나 100 이상의 권한 부여)<br>
     404: 사용자를 찾을 수 없음<br>
     409: 이미 존재하는 사용자 이름<br>
     """
+    await service.guard_update(conn, request.state.user, useridx, user_data)
     res = await service.update_user(
         conn, useridx, user_data, current_token_idx=get_token_idx(request)
     )
@@ -187,5 +191,7 @@ async def delete_user(request: Request, useridx: int, conn=get_db):
     403: 권한 없음  <br>
     404: 사용자를 찾을 수 없음<br>
     """
+    target = await service.get_user_byid(conn, useridx)  # 404 first
+    service.assert_can_manage(request.state.user, target)
     res = await service.delete_user(conn, useridx)
     return APIResponse(data=dict(res))

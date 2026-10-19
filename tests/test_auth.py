@@ -148,7 +148,7 @@ async def test_cannot_create_admin_via_api(client: AsyncClient, admin_token: str
             "permission": 100,
         },
     )
-    assert res.status_code == 422, res.text
+    assert res.status_code == 403, res.text
 
 
 @pytest.mark.asyncio

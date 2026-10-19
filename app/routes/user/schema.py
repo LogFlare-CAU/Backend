@@ -21,9 +21,7 @@ class UserCreateParams(BaseModel):
 
     @field_validator("permission")
     @classmethod
-    def permission_below_admin(cls, v: int) -> int:
-        if v >= Permissions.ADMINISTRATOR:
-            raise ValueError("Cannot assign administrator permission via API")
+    def permission_valid(cls, v: int) -> int:
         if v < Permissions.USER:
             raise ValueError("Invalid permission value")
         return v
@@ -51,11 +49,9 @@ class UserUpdateParams(BaseModel):
 
     @field_validator("permission")
     @classmethod
-    def permission_below_admin(cls, v: int | None) -> int | None:
+    def permission_valid(cls, v: int | None) -> int | None:
         if v is None:
             return v
-        if v >= Permissions.ADMINISTRATOR:
-            raise ValueError("Cannot assign administrator permission via API")
         if v < Permissions.USER:
             raise ValueError("Invalid permission value")
         return v

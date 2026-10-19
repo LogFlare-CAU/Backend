@@ -5,8 +5,9 @@ from typing import Sequence
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.status import HTTP_404_NOT_FOUND, HTTP_409_CONFLICT
+from starlette.status import HTTP_403_FORBIDDEN, HTTP_404_NOT_FOUND, HTTP_409_CONFLICT
 
+from common.enums import Permissions
 from common.jwt_utils import generate_jwt
 from common.security import hash_password
 
@@ -20,6 +21,41 @@ async def get_user(conn: AsyncSession, username: str) -> model.User:
     if not user:
         raise HTTPException(HTTP_404_NOT_FOUND)
     return user
+
+
+def assert_can_assign_permission(caller: model.User, permission: int) -> None:
+    """Permission set through the API must be <= caller's and never Super Admin (100)."""
+    if permission >= Permissions.ADMINISTRATOR:
+        raise HTTPException(HTTP_403_FORBIDDEN, "Cannot assign Super Admin permission via API")
+    if permission > caller.permission:
+        raise HTTPException(HTTP_403_FORBIDDEN, "Cannot assign a permission higher than your own")
+
+
+def assert_can_manage(
+    caller: model.User, target: model.User, *, allow_self: bool = False
+) -> None:
+    """Target must rank strictly below the caller (self only where allow_self)."""
+    if target.idx == caller.idx:
+        if allow_self:
+            return
+        raise HTTPException(HTTP_403_FORBIDDEN, "You cannot perform this action on your own account")
+    if target.permission >= caller.permission:
+        raise HTTPException(
+            HTTP_403_FORBIDDEN, "Insufficient permission to manage a user of equal or higher rank"
+        )
+
+
+async def guard_update(
+    conn: AsyncSession, caller: model.User, useridx: int, item: schema.UserUpdateParams
+) -> None:
+    target = await get_user_byid(conn, useridx)  # 404 first
+    if target.idx == caller.idx:
+        if item.permission is not None and item.permission != target.permission:
+            raise HTTPException(HTTP_403_FORBIDDEN, "You cannot change your own permission")
+        return
+    assert_can_manage(caller, target)
+    if item.permission is not None:
+        assert_can_assign_permission(caller, item.permission)
 
 
 async def list_users(conn: AsyncSession) -> Sequence[model.User]:
