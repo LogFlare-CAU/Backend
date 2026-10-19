@@ -28,6 +28,9 @@ h1 { font-size:1.25rem; margin:0 0 12px }
 .detail pre { margin:6px 0 0; padding:8px; background:var(--color-surface-2); border-radius:6px; white-space:pre-wrap; overflow-wrap:anywhere; overflow-x:auto; max-width:100%; box-sizing:border-box; font-size:.8rem }
 .detail .t { font-size:.75rem; color:var(--color-muted); margin-top:8px }
 .err { color:var(--color-danger) }
+dialog#qrd { max-width:min(92vw,420px); border:1px solid var(--color-border); border-radius:12px; background:var(--color-bg); color:var(--color-text); padding:16px }
+#qrbox svg { display:block; width:100%; height:auto; max-width:320px; margin:8px auto }
+.warn { color:var(--color-danger); margin:6px 0 }
 .tab[aria-pressed=true] { background:var(--color-accent); color:var(--color-on-accent) }
 </style>
 </head>
@@ -50,12 +53,19 @@ h1 { font-size:1.25rem; margin:0 0 12px }
     <select class="select" id="proj" aria-label="컨테이너"><option value="">모든 컨테이너</option></select>
     <label class="check-row"><input type="checkbox" id="ign"> 무시한 것도 보기</label>
     <span class="grow"></span>
+    <button class="btn btn-ghost" id="qrb" hidden>Access QR</button>
     <button class="btn btn-ghost" id="out">로그아웃</button>
   </div>
   <div id="list"></div>
   <div class="bar"><button class="btn btn-ghost" id="more" hidden>더 보기</button></div>
   <div id="msg" class="err"></div>
 </section>
+<dialog id="qrd" aria-label="Access 로그인 QR">
+  <div id="qrbox"></div>
+  <div id="qrinfo" class="t"></div>
+  <div id="qrwarn" class="warn"></div>
+  <div class="bar"><button class="btn btn-ghost" id="qrx" type="button">닫기</button></div>
+</dialog>
 </main>
 <script>
 (() => {
@@ -77,11 +87,12 @@ h1 { font-size:1.25rem; margin:0 0 12px }
     const r = await fetch(base + path, { ...opts, headers });
     if ((r.status === 400 || r.status === 401) && path !== 'user/auth') throw new AuthError();
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(j.message || j.detail || ('HTTP ' + r.status));
+    if (!r.ok) { const e = new Error(j.message || j.detail || ('HTTP ' + r.status)); e.status = r.status; e.data = j.data; throw e; }
     return j.data;
   }
 
-  function showLogin() { store.set(null); seq++; $('list').replaceChildren(); $('proj').length = 1; $('more').hidden = true; $('app').hidden = true; $('login').hidden = false; }
+  function closeQr() { const d = $('qrd'); if (d.open) d.close(); $('qrbox').replaceChildren(); $('qrinfo').textContent = ''; $('qrwarn').textContent = ''; }
+  function showLogin() { closeQr(); $('qrb').hidden = true; store.set(null); seq++; $('list').replaceChildren(); $('proj').length = 1; $('more').hidden = true; $('app').hidden = true; $('login').hidden = false; }
   function showApp() { $('login').hidden = true; $('app').hidden = false; }
   async function guard(fn) {
     try { await fn(); $('msg').textContent = ''; }
@@ -155,8 +166,39 @@ h1 { font-size:1.25rem; margin:0 0 12px }
     if (!offset) $('list').append(el('div', 'empty', '묶음이 없습니다'));
   }
 
+  // 관리자(permission 100)에게만 버튼을 보인다. 서버도 403 으로 막는다. 실패하면 그냥 숨긴 채 둔다.
+  async function showQrButton() {
+    try { const me = await api('user/me'); $('qrb').hidden = me.permission !== 100; }
+    catch (e) { if (e instanceof AuthError) showLogin(); }
+  }
+
+  // 서버가 준 SVG 문자열은 innerHTML 이 아니라 DOMParser 로 파싱해 svg 요소만 가져온다.
+  async function openQr() {
+    $('qrbox').replaceChildren(); $('qrinfo').textContent = ''; $('qrwarn').textContent = '';
+    if (!$('qrd').open) $('qrd').showModal();
+    try {
+      const d = await api('user/access-qr');
+      const doc = new DOMParser().parseFromString(d.svg, 'image/svg+xml');
+      const root = doc.documentElement;
+      if (!root || root.localName !== 'svg' || doc.getElementsByTagName('parsererror').length) throw new Error('QR 을 표시할 수 없습니다');
+      $('qrbox').append(document.importNode(root, true));
+      $('qrinfo').textContent = d.server + ' · ' + d.clientId;
+      const w = [];
+      if (!d.mapped) w.push('이 토큰이 LogFlare 사용자에 연결되어 있지 않아 앱으로 찍어도 로그인되지 않습니다' + (d.mappedReason ? ' (' + d.mappedReason + ')' : '') + '.');
+      if (!d.accessEnabled) w.push('Access 로그인이 꺼져 있어 앱으로 찍어도 로그인되지 않습니다.');
+      $('qrwarn').textContent = w.join(' ');
+    } catch (e) {
+      if (e instanceof AuthError) return showLogin();
+      const dd = e.data || {};
+      if (e.status === 404 && dd.reason === 'qr_unconfigured') $('qrwarn').textContent = 'QR 기능이 꺼져 있습니다. 서버 설정이 빠졌습니다: ' + (dd.missing || []).join(', ');
+      else if (e.status === 503) $('qrwarn').textContent = '서버에 QR 라이브러리가 없습니다.';
+      else $('qrwarn').textContent = e.message;
+    }
+  }
+
   async function init() {
     showApp();
+    showQrButton();
     // 컨테이너 목록을 못 불러와도 묶음 목록은 따로 불러온다.
     await guard(async () => {
       const ps = await api('project/');
@@ -174,6 +216,9 @@ h1 { font-size:1.25rem; margin:0 0 12px }
   $('proj').onchange = $('ign').onchange = () => guard(() => load(true));
   $('more').onclick = () => guard(() => load(false));
   $('out').onclick = showLogin;
+  $('qrb').onclick = openQr;
+  $('qrx').onclick = closeQr;
+  $('qrd').addEventListener('close', closeQr);
   $('login').onsubmit = async e => {
     e.preventDefault(); $('lerr').textContent = '';
     try {
