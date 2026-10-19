@@ -139,6 +139,9 @@ async def delete_token(conn: AsyncSession, token: model.Token) -> None:
 
 
 async def delete_expired_tokens(conn: AsyncSession) -> None:
+    from routes.fcm import service as fcm_service  # 순환 import 회피
+
+    await fcm_service.sweep_stale_legacy_tokens(conn)
     now = int(time.time())
     stmt = (
         select(model.Token)

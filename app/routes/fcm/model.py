@@ -16,3 +16,13 @@ class FCMToken(Base):
         nullable=False,
         comment="사용자 고유번호",
     )
+    # 등록한 로그인 토큰. NULL 이면 바인딩 이전(레거시) 행 — last_delivery 기준 30일 뒤 정리.
+    token_idx = Column(
+        Integer,
+        ForeignKey(
+            "tokens.idx", ondelete="CASCADE", name="fk_fcm_tokens_token_idx_tokens"
+        ),
+        nullable=True,
+        index=True,
+        comment="등록한 로그인 토큰 고유번호",
+    )

@@ -308,7 +308,7 @@ async def test_event_for_new_container_pushes_after_project_commit(monkeypatch):
 
     monkeypatch.setattr(tasks, "send_fcm_message", fake)
     async with async_session() as s:
-        s.add(FCMToken(fcm_token="tok", user_idx=1))
+        s.add(FCMToken(fcm_token="tok", user_idx=1, last_delivery=datetime.now(UTC)))
         await s.commit()
     await collect_once(make_docker({}, events=_ev("die", 5, exitCode="3", name="brandnew")), NOW)
     assert len(sent) == 1

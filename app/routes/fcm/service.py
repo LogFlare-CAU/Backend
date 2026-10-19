@@ -1,16 +1,29 @@
-from datetime import UTC, datetime
+import time
+from datetime import UTC, datetime, timedelta
 from typing import Sequence
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import and_, delete, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from routes.user.model import Token
+
 from . import model, schema
+
+# 로그인 토큰에 묶이지 않은(token_idx NULL) 레거시 행의 유효 기간.
+LEGACY_TTL = timedelta(days=30)
+
+
+def _legacy_cutoff() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None) - LEGACY_TTL
 
 
 async def register_fcm_token(
-    conn: AsyncSession, userid: int, item: schema.FCMTokenParams
+    conn: AsyncSession,
+    userid: int,
+    item: schema.FCMTokenParams,
+    token_idx: int | None = None,
 ) -> model.FCMToken:
     for _ in range(2):
         result = await conn.execute(
@@ -19,12 +32,16 @@ async def register_fcm_token(
         fcm_token = result.scalars().first()
         now = datetime.now(UTC)
         if fcm_token:
-            # Idempotent: refresh, and reassign if the device changed account.
+            # Idempotent: refresh, and rebind if the device changed account/login.
             fcm_token.user_idx = userid
+            fcm_token.token_idx = token_idx
             fcm_token.last_delivery = now
         else:
             fcm_token = model.FCMToken(
-                user_idx=userid, fcm_token=item.fcm_token, last_delivery=now
+                user_idx=userid,
+                fcm_token=item.fcm_token,
+                last_delivery=now,
+                token_idx=token_idx,
             )
             conn.add(fcm_token)
         try:
@@ -91,7 +108,38 @@ async def clean_fcm_tokens(
 
 
 async def get_fcm_tokens(conn: AsyncSession, userid: int) -> Sequence[model.FCMToken]:
-    stmt = select(model.FCMToken).where(model.FCMToken.user_idx == userid)
+    """Deliverable FCM rows for a user.
+
+    Bound rows: only while their login token exists and is not expired (same rule
+    as require_login). Legacy unbound rows: only while last_delivery is within
+    LEGACY_TTL.
+    """
+    now = int(time.time())
+    fcm = model.FCMToken
+    stmt = (
+        select(fcm)
+        .outerjoin(Token, Token.idx == fcm.token_idx)
+        .where(fcm.user_idx == userid)
+        .where(
+            or_(
+                and_(
+                    Token.idx.isnot(None),
+                    Token.user_idx == fcm.user_idx,
+                    or_(Token.exp.is_(None), Token.exp < 0, Token.exp >= now),
+                ),
+                and_(fcm.token_idx.is_(None), fcm.last_delivery >= _legacy_cutoff()),
+            )
+        )
+    )
     result = await conn.execute(stmt)
-    tokens = result.scalars().all()
-    return tokens
+    return result.scalars().all()
+
+
+async def sweep_stale_legacy_tokens(conn: AsyncSession) -> None:
+    """Delete unbound rows not refreshed within LEGACY_TTL (caller commits)."""
+    fcm = model.FCMToken
+    await conn.execute(
+        delete(fcm)
+        .where(fcm.token_idx.is_(None))
+        .where(or_(fcm.last_delivery.is_(None), fcm.last_delivery < _legacy_cutoff()))
+    )

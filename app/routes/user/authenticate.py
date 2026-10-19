@@ -89,6 +89,7 @@ async def _require_login(
 
     user = await service.get_user_byid(conn, int(user_idx))
     request.state.user_id = user.idx
+    request.state.token_idx = db_token.idx
     request.state.user = user
     request.state.auth_payload = payload
     return payload
@@ -109,6 +110,11 @@ async def _require_moderator(
 
 require_moderator = [Depends(_require_moderator)]
 require_login = [Depends(_require_login)]
+
+
+def get_token_idx(request: Request) -> int | None:
+    """tokens.idx of the login token that authenticated this request (set by require_login)."""
+    return getattr(request.state, "token_idx", None)
 
 
 def get_userid(request: Request) -> int:

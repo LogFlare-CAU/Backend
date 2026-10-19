@@ -7,7 +7,12 @@ from common.fcm import send_fcm_message
 from common.schema import APIResponse
 from common.schema import response_maker as r_make
 from common.sqlsession import get_db
-from routes.user.authenticate import get_userid, require_login, require_moderator
+from routes.user.authenticate import (
+    get_token_idx,
+    get_userid,
+    require_login,
+    require_moderator,
+)
 
 from . import schema, service
 from .init import get_client_fcm_config
@@ -43,10 +48,14 @@ async def register_fcm_token(
 ):
     """
     FCM 토큰을 등록합니다.<br>
-    로그인 토큰이 필요합니다.
+    로그인 토큰이 필요합니다.<br>
+    행은 이 요청을 인증한 로그인 토큰에 묶이며, 다른 로그인으로 다시 등록하면 그 로그인으로 옮겨집니다.<br>
+    묶인 로그인 토큰이 만료·삭제되면 이 기기로는 더 이상 푸시를 보내지 않습니다.
     """
     user = get_userid(request)
-    token = await service.register_fcm_token(conn, user, fcm_data)
+    token = await service.register_fcm_token(
+        conn, user, fcm_data, token_idx=get_token_idx(request)
+    )
     return APIResponse(data=dict(token))
 
 

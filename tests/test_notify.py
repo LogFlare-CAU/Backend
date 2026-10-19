@@ -28,7 +28,8 @@ def sent(monkeypatch):
 @pytest_asyncio.fixture(autouse=True)
 async def superuser_token():
     async with async_session() as s:
-        s.add(FCMToken(fcm_token="tok", user_idx=1))
+        # 레거시(미바인딩) 행 — 최근 등록이어야 전송 대상
+        s.add(FCMToken(fcm_token="tok", user_idx=1, last_delivery=datetime.now(UTC)))
         await s.commit()
 
 
